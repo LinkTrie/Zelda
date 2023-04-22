@@ -61,8 +61,7 @@ hitbox_flag db 0
 move_amount dw 0
 link_location dw 160
 button_pressed db 0
-hitbox flag db 0
-
+CLOCK equ es:6Ch
 
 CODESEG
 ;------------------------------------------------Room Defining Procedures------------------------------------------------;
@@ -269,16 +268,16 @@ push bx
     mov di,[bp+8]
     mov di,[di]
 
-    mov cx,4
+    mov cx,2
     hitbox_i_loop_outer:
     xor bx,bx
     hitbpx_i_loop_inner:
     mov [si],di
     inc si
     inc bx
-    cmp bx,4
+    cmp bx,2
     jz hitbpx_i_loop_inner
-    add si,76
+    add si,24
     loop hitbox_i_loop_outer
 
 pop bx
@@ -450,8 +449,47 @@ endp delay
 ;------------------------------------------END--> delay procedure <--END------------------------------------------;
 
 ;--------------------------------------------custom random procedure--------------------------------------------;
+;bp+4=upper limit of random
+;bp+6=random number
 proc generate_random_number
+push bp
+mov bp,sp
 
+    mov ax, 40h
+    mov es, ax
+
+	xor ax,ax
+	mov ax,[CLOCK]
+    mov di,ax
+
+    mov si,69h
+    mul si
+    rol ax,1
+
+    xor ax,di
+    mov di,420h
+    mul si
+    rol ax,2
+
+    mov si,[bp+4]       ;making it the right size
+    div si
+
+    mov ax,dx
+    mov di,ax
+
+    mov si,21h
+    mul si
+    rol ax,1
+
+    xor ax,di
+    mov di,87h
+    mul si
+    rol ax,2
+
+    mov si,[bp+4]       ;making it the right size
+    div si
+    mov si,[bp+6]
+    mov [si],dx
 
 ret
 endp generate_random_number
@@ -559,7 +597,7 @@ mov si,[bp+8]       ;si has the random number offset
 push si
 push 0
 push 4      ;these are the borders of the randomally generated number
-call ;random proc thing
+call generate_random_number 
 
 mov dx,8
 cmp [si],1
@@ -581,10 +619,11 @@ mov dx,0
 
 end_enemy_movement:
 push si
-push 1
-push 3      ;these are the borders of the randomally generated number
-call ;random proc thing
+push 0
+push 2      ;these are the borders of the randomally generated number
+call generate_random_number     
 mov si,[si]     ;si has the random number
+inc si
 mov di,[bp+12]  ;the aomunt of turns the enemy will move like so
 mov [di],si     ;the amount of time for the movement is decided
 mov si,[bp+10]
