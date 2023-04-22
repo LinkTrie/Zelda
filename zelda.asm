@@ -62,6 +62,9 @@ move_amount dw 0
 link_location dw 160
 button_pressed db 0
 CLOCK equ es:6Ch
+enemy_movement_by_turns db 0
+enemy_move_amount dw 0
+
 
 CODESEG
 ;------------------------------------------------Room Defining Procedures------------------------------------------------;
@@ -121,7 +124,9 @@ push dx
     again_grid:
     xor dx,dx
     xor ax,ax
-    
+
+;The following tiles until the next time it says its different are walkeble tiles
+
     mov di,[bp+38]                  ;the offset of the hitbox flag
     mov [byte ptr di],0             ;0 means a walkable tile
 
@@ -269,15 +274,15 @@ push bx
     mov di,[di]
 
     mov cx,2
-    hitbox_i_loop_outer:
+hitbox_i_loop_outer:
     xor bx,bx
-    hitbpx_i_loop_inner:
+hitbpx_i_loop_inner:
     mov [si],di
     inc si
     inc bx
     cmp bx,2
     jz hitbpx_i_loop_inner
-    add si,24
+    add si,44
     loop hitbox_i_loop_outer
 
 pop bx
@@ -310,21 +315,41 @@ push ax
 
     mov ax,[bp+4]       ;ax recieves the location of link on the screen
     add ax,[bp+10]      ;ax now has the new location of link on the screen)
-    mov di,16
+    mov di,64
     div di              ;ax now has the location of link in the hitbox area
     mov si,[bp+6]
-    add si,ax           ;di now has the location of link in the hitbox area
+    add si,ax           ;si now has the location of link in the hitbox area
 
 
+    mov di,[bp+8]       ;di now has the hitbox flag offset
 
+    mov ax,1            ;the value the hitbox flag will recieve
+    cmp [byte ptr si],1          ;the same one
+    jz end_hitbox_flag
+    cmp [byte ptr si-44],1       ;the one under
+    jz end_hitbox_flag
+    cmp [byte ptr si+2],1        ;the one above
+    jz end_hitbox_flag
 
+    mov ax,2            ;the value the hitbox flag will recieve
+    cmp [byte ptr si],1          ;the same one
+    jz end_hitbox_flag
+    cmp [byte ptr si-44],2       ;the one under
+    jz end_hitbox_flag
+    cmp [byte ptr si+2],2        ;the one above
+    jz end_hitbox_flag
 
+    mov ax,0            ;the value the hitbox flag will recieve - in this case its just walkable land
+
+    end_hitbox_flag:
+    mov [byte ptr di],al         ;the hitbox flag now has the correct value
+    
 pop ax
 pop dx
 pop di
 pop si
 pop bp
-ret
+ret 8
 endp check_hitbox_link
 ;----------------------------------------------END--> Check Hitbox <--END----------------------------------------------;
 
@@ -516,6 +541,13 @@ endp generate_random_number
 ;9.[bp+20]=offset link_up_1
 ;10.[bp+22]=offset link_up_2
 ;11.[bp+24]=offset screen_part_buffer
+;12.[bp+26]=hitbox grid offset 
+;13.[bp+28]=hitbox flag offset
+
+;bp+4=offset link location
+;bp+6=offset hitbox grid
+;bp+8=offset hitbox flag
+;bp+10=link movement
 proc main_link_movement
 push bp
 mov bp,sp
@@ -528,7 +560,19 @@ push bx
     
     cmp [byte ptr di], 's'
     jnz conts
+
     mov di,1280
+    push [bp+4]
+    push [bp+26]
+    push [bp+28]
+    push di
+    call check_hitbox_link  ;procedure that checks if link should move or not
+    mov bx,[bp+28]
+    cmp bx,0                ;if link is not going to a clean tile he cannot move
+    jz yes_moving_down
+    mov di,0                ;now link will move zero spaces
+    yes_moving_down:
+
     push [bp+10]    ;offset link 2nd wanted sprite
     push [bp+8]     ;offset link 1st wanted sprite
     push [bp+24]    ;offsetscreen part buffer
@@ -539,7 +583,19 @@ push bx
 
     cmp [byte ptr di], 'w'
     jnz contw
+
     mov di,-1280
+    push [bp+4]
+    push [bp+26]
+    push [bp+28]
+    push di
+    call check_hitbox_link  ;procedure that checks if link should move or not
+    mov bx,[bp+28]
+    cmp bx,0                ;if link is not going to a clean tile he cannot move
+    jz yes_moving_up
+    mov di,0                ;now link will move zero spaces
+    yes_moving_up:
+
     push [bp+22]    ;offset link 2nd wanted sprite
     push [bp+20]    ;offset link 1st wanted sprite
     push [bp+24]    ;offsetscreen part buffer
@@ -550,7 +606,19 @@ push bx
 
     cmp [byte ptr di], 'd'
     jnz contd
+
     mov di,4
+    push [bp+4]
+    push [bp+26]
+    push [bp+28]
+    push di
+    call check_hitbox_link  ;procedure that checks if link should move or not
+    mov bx,[bp+28]
+    cmp bx,0                ;if link is not going to a clean tile he cannot move
+    jz yes_moving_right
+    mov di,0                ;now link will move zero spaces
+    yes_moving_right:
+
     push [bp+18]    ;offset link 2nd wanted sprite
     push [bp+16]     ;offset link 1st wanted sprite
     push [bp+24]    ;offsetscreen part buffer
@@ -561,7 +629,19 @@ push bx
 
     cmp [byte ptr di], 'a'
     jnz conta
+
     mov di,-4
+    push [bp+4]
+    push [bp+26]
+    push [bp+28]
+    push di
+    call check_hitbox_link  ;procedure that checks if link should move or not
+    mov bx,[bp+28]
+    cmp bx,0                ;if link is not going to a clean tile he cannot move
+    jz yes_moving_left
+    mov di,0                ;now link will move zero spaces
+    yes_moving_left:
+
     push [bp+14]    ;offset link 2nd wanted sprite
     push [bp+12]    ;offset link 1st wanted sprite
     push [bp+24]    ;offsetscreen part buffer
@@ -574,7 +654,7 @@ pop bx
 pop di
 pop si
 pop bp
-ret 22
+ret 26
 endp main_link_movement
 
 ;------------------------------------------END--> Main Link Movement <--END------------------------------------------;
@@ -600,19 +680,19 @@ push 4      ;these are the borders of the randomally generated number
 call generate_random_number 
 
 mov dx,8
-cmp [si],1
+cmp [word ptr si],1
 jz end_enemy_movement
 
 mov dx,2560
-cmp [si],2
+cmp [word ptr si],2
 jz end_enemy_movement
 
 mov dx,-8
-cmp [si],3
+cmp [word ptr si],3
 jz end_enemy_movement
 
 mov dx,-2560
-cmp [si],4
+cmp [word ptr si],4
 jz end_enemy_movement
 
 mov dx,0
@@ -622,16 +702,16 @@ push si
 push 0
 push 2      ;these are the borders of the randomally generated number
 call generate_random_number     
-mov si,[si]     ;si has the random number
+mov si,[word ptr si]     ;si has the random number
 inc si
 mov di,[bp+12]  ;the aomunt of turns the enemy will move like so
-mov [di],si     ;the amount of time for the movement is decided
+mov [word ptr di],si     ;the amount of time for the movement is decided
 mov si,[bp+10]
-mov [si],dx
+mov [word ptr si],dx
 
 no_new_movement:
 mov di,[bp+12]
-dec [di]
+dec [byte ptr di]
 
 ret 10
 endp enemy_movement
@@ -745,9 +825,10 @@ start:
 
     mov ah,0h
     int 16h
-    
     ;CALLING -> main link movement
     mov [button_pressed],al
+    push offset hitbox_flag         ;bp+28
+    push offset hitbox_grid         ;bp+26
     push offset screen_part_buffer  ;bp+24
 
     push offset link_up_2           ;bp+22
