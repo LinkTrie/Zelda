@@ -41,7 +41,7 @@ DATASEG
 ;    ⠀⢰⣳⣣⠔⠉⢱⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢇⠘⠀⠀⢀⣤⣶⣶⣶⣶⣾⣗
 ;    ⢠⢯⠋⠀⠠⡴⠋⠙⠢⡄⠀⣠⡤⢔⣶⣶⣶⣶⣼⣤⣴⣾⡿⠋⢁⣤⣤⣽⣿⡏
 ;    ⢸⣸⠀⠒⢻⣧⣶⣤⣴⣗⡏⠁⠀⠀⠀⠀⠀⠈⢻⣿⣿⣿⣠⣿⣿⣿⣿⣿⣿⠁
-;    ⣸⡏⠀⠘⠃⡿⢟⠇⢀⡿⣧⡄⠀⠀⠀⠀⠀⠀⣠⣿⠻⣿⣿⣿⣿⣿⣿⣿⠋⠀
+;    ⣸⡏⠀⠘⠃⡿⢟⠇⢀⡿⣧⡄⠀⠀⠀⠀⠀⠀⣠⣿⠻⣿⣿⣿⣿⣿⣿⣿⠋⠀⢸
 ;    ⣷⠃⠀⠀⡇⡇⠀⣱⠞⠁⠸⣿⣦⡀⠀⠀⠀⠀⣸⠏⠀⠙⠻⢿⢿⣿⡟⠋⠀⢀
 ;    ⢻⠀⠀⠀⣇⠴⠚⠁⠀⠀⠀⠈⠛⠿⢿⠤⠴⠚⠁⠀⣀⣠⠤⢔⡿⡟⠀⠀⠀⢸
 ;    ⣇⣘⡓⣺⡿⠀⠀⢠⠶⠒⢶⣲⡒⠒⠒⠒⠒⣛⣉⡩⠤⠖⠚⢁⡝⢠⡄⠀⢀⠦
@@ -55,12 +55,13 @@ DATASEG
 include "sprites.inc"
 
 screen_part_buffer db 256 dup(66)
-hitbox_grid db 4000 dup(0)
+hitbox_grid db 1056 dup(1)
 current_room db 1
 hitbox_flag db 0
 move_amount dw 0
 link_location dw 160
-button_pressed db 0
+link_location_in_hitbox dw 26
+button_pressed db 's'
 CLOCK equ es:6Ch
 enemy_movement_by_turns db 0
 enemy_move_amount dw 0
@@ -205,10 +206,10 @@ push dx
     push di
     call put_sprite
 
-    push [bp+40]
-    push bx
-    push [bp+38]
-    call hitboxes_initialization
+    ;push [bp+40]
+    ;push bx
+    ;push [bp+38]
+    ;call hitboxes_initialization
 
     inc si
     add bx,16
@@ -301,7 +302,7 @@ endp hitboxes_initialization
 ;2 - GOT HIT (BY ENEMY)
 ;------------------------------------------------> Check Hitbox <------------------------------------------------;
 ;this procedure recieves:
-;bp+4=offset link location
+;bp+4=offset link location in hitbox
 ;bp+6=offset hitbox grid
 ;bp+8=offset hitbox flag
 ;bp+10=link movement
@@ -312,14 +313,13 @@ push si
 push di
 push dx
 push ax
+push bx
 
-    mov ax,[bp+4]       ;ax recieves the location of link on the screen
-    add ax,[bp+10]      ;ax now has the new location of link on the screen)
-    mov di,64
-    div di              ;ax now has the location of link in the hitbox area
-    mov si,[bp+6]
+    mov si,[bp+4]       ;ax recieves the location of link on the screen
+    mov ax,[si]
+    add ax,[bp+10]      ;ax now has the location of link in the hitbox area
+    mov si,[bp+6]       ;offset of the hitbox grid
     add si,ax           ;si now has the location of link in the hitbox area
-
 
     mov di,[bp+8]       ;di now has the hitbox flag offset
 
@@ -328,7 +328,7 @@ push ax
     jz end_hitbox_flag
     cmp [byte ptr si-44],1       ;the one under
     jz end_hitbox_flag
-    cmp [byte ptr si+2],1        ;the one above
+    cmp [byte ptr si+2],1        ;the one right
     jz end_hitbox_flag
 
     mov ax,2            ;the value the hitbox flag will recieve
@@ -336,14 +336,15 @@ push ax
     jz end_hitbox_flag
     cmp [byte ptr si-44],2       ;the one under
     jz end_hitbox_flag
-    cmp [byte ptr si+2],2        ;the one above
+    cmp [byte ptr si+2],2        ;the one right
     jz end_hitbox_flag
 
     mov ax,0            ;the value the hitbox flag will recieve - in this case its just walkable land
 
     end_hitbox_flag:
     mov [byte ptr di],al         ;the hitbox flag now has the correct value
-    
+
+pop bx    
 pop ax
 pop dx
 pop di
@@ -396,7 +397,7 @@ pop bx
 pop cx
 pop dx
 pop bp
-ret 2
+ret 4
 endp get_screen_part_buffer
 ;-------------------------------------------placeSprite--------------------------------------------;
 ;this proc recives:
@@ -516,7 +517,8 @@ mov bp,sp
     mov si,[bp+6]
     mov [si],dx
 
-ret
+pop bp
+ret 4
 endp generate_random_number
 ;--------------------------------------------custom random procedure--------------------------------------------;
 
@@ -543,11 +545,7 @@ endp generate_random_number
 ;11.[bp+24]=offset screen_part_buffer
 ;12.[bp+26]=hitbox grid offset 
 ;13.[bp+28]=hitbox flag offset
-
-;bp+4=offset link location
-;bp+6=offset hitbox grid
-;bp+8=offset hitbox flag
-;bp+10=link movement
+;14.[bp+30]=link location in hitbox
 proc main_link_movement
 push bp
 mov bp,sp
@@ -557,17 +555,20 @@ push bx
 
     mov si,[bp+4]   ;si has the offset of link_location
     mov di,[bp+6]   ;di recieves the offset of button_pressed
-    
+
+
     cmp [byte ptr di], 's'
     jnz conts
 
-    mov di,1280
-    push [bp+4]
-    push [bp+26]
+    mov di,2560
+    push 44
     push [bp+28]
-    push di
+    push [bp+26]
+    push [bp+30]
     call check_hitbox_link  ;procedure that checks if link should move or not
     mov bx,[bp+28]
+    mov bx,[bx]
+
     cmp bx,0                ;if link is not going to a clean tile he cannot move
     jz yes_moving_down
     mov di,0                ;now link will move zero spaces
@@ -581,16 +582,19 @@ push bx
     call all_actions
     conts:
 
+
     cmp [byte ptr di], 'w'
     jnz contw
 
-    mov di,-1280
-    push [bp+4]
-    push [bp+26]
+    mov di,-2560
+    push -44
     push [bp+28]
-    push di
+    push [bp+26]
+    push [bp+30]
     call check_hitbox_link  ;procedure that checks if link should move or not
     mov bx,[bp+28]
+    mov bx,[bx]
+
     cmp bx,0                ;if link is not going to a clean tile he cannot move
     jz yes_moving_up
     mov di,0                ;now link will move zero spaces
@@ -604,16 +608,19 @@ push bx
     call all_actions
     contw:
 
+
     cmp [byte ptr di], 'd'
     jnz contd
 
-    mov di,4
-    push [bp+4]
-    push [bp+26]
+    mov di,8
+    push 2
     push [bp+28]
-    push di
+    push [bp+26]
+    push [bp+30]
     call check_hitbox_link  ;procedure that checks if link should move or not
     mov bx,[bp+28]
+    mov bx,[bx]
+
     cmp bx,0                ;if link is not going to a clean tile he cannot move
     jz yes_moving_right
     mov di,0                ;now link will move zero spaces
@@ -627,16 +634,19 @@ push bx
     call all_actions
     contd:
 
+
     cmp [byte ptr di], 'a'
     jnz conta
 
-    mov di,-4
-    push [bp+4]
-    push [bp+26]
+    mov di,-8
+    push -2
     push [bp+28]
-    push di
+    push [bp+26]
+    push [bp+30]
     call check_hitbox_link  ;procedure that checks if link should move or not
     mov bx,[bp+28]
+    mov bx,[bx]
+    
     cmp bx,0                ;if link is not going to a clean tile he cannot move
     jz yes_moving_left
     mov di,0                ;now link will move zero spaces
@@ -827,6 +837,7 @@ start:
     int 16h
     ;CALLING -> main link movement
     mov [button_pressed],al
+    push offset link_location_in_hitbox ;bp+30
     push offset hitbox_flag         ;bp+28
     push offset hitbox_grid         ;bp+26
     push offset screen_part_buffer  ;bp+24
@@ -850,6 +861,8 @@ start:
 
     push 1
     call delay
+    cmp [button_pressed],27
+    jz exit
     jmp bad
 ; --------------------------
 	
