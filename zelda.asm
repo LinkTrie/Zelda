@@ -58,16 +58,24 @@ hitbox_grid db 960 dup(0)
 current_hitbox_grid_pointer dw 0
 current_room db 1
 hitbox_flag db 0
+new_room_flag db 1
 move_amount dw 0
 link_location dw 160
 link_location_in_hitbox dw 20
 button_pressed db 's'
+last_press db 0
 CLOCK equ es:6Ch
-enemy_movement_by_turns db 0
-enemy_move_amount dw 0
 hitbox_grid_pointer dw 0
+enemy1_location dw 0
+enemy1_movement_by_turns db 0
+enemy1_move_amount dw 0
+random_number dw 0
 
-
+;bp+4=wanted enemy location offset
+;bp+6=link location offset
+;bp+8=random_number
+;bp+10=enemy_move_amount
+;bp+12=enemy movement counter (turns)
 CODESEG
 ;------------------------------------------------Room Defining Procedures------------------------------------------------;
 ;IMPORTANT NOTES FOR ALL THESE PROCS:
@@ -285,10 +293,6 @@ push bx
     mov bx,[bp+4]                ;offset of hitbox flag
     mov bl,[byte ptr bx]         ;bx now holds the information inside of the hitbox flag
     mov si,ax
-    
-    ;mov si, offset hitbox_grid
-    ;add si, [hitbox_grid_pointer]
-    ;mov bl, [hitbox_flag]
 
     mov [byte ptr si],bl
     mov [byte ptr si+1],bl
@@ -492,10 +496,15 @@ endp delay
 
 ;--------------------------------------------custom random procedure--------------------------------------------;
 ;bp+4=upper limit of random
-;bp+6=random number
+;bp+6=random number (in memory)
 proc generate_random_number
 push bp
 mov bp,sp
+push ax
+push di
+push si
+push es
+push dx
 
     mov ax, 40h
     mov es, ax
@@ -504,12 +513,12 @@ mov bp,sp
 	mov ax,[CLOCK]
     mov di,ax
 
-    mov si,69h
+    mov si,61h
     mul si
     rol ax,1
 
     xor ax,di
-    mov di,420h
+    mov di,421h
     mul si
     rol ax,2
 
@@ -519,12 +528,12 @@ mov bp,sp
     mov ax,dx
     mov di,ax
 
-    mov si,21h
+    mov si,23h
     mul si
     rol ax,1
 
     xor ax,di
-    mov di,87h
+    mov di,89h
     mul si
     rol ax,2
 
@@ -533,6 +542,11 @@ mov bp,sp
     mov si,[bp+6]
     mov [si],dx
 
+pop dx
+pop es
+pop si
+pop di
+pop ax
 pop bp
 ret 4
 endp generate_random_number
@@ -559,15 +573,66 @@ endp generate_random_number
 ;9.[bp+20]=offset link_up_1
 ;10.[bp+22]=offset link_up_2
 ;11.[bp+24]=offset screen_part_buffer
-;12.[bp+26]=hitbox grid offset 
-;13.[bp+28]=hitbox flag offset
-;14.[bp+30]=link location in hitbox
+;12.[bp+26]=offset hitbox grid offset 
+;13.[bp+28]=offset hitbox flag offset
+;14.[bp+30]=offset link location in hitbox
+;15.[bp+32]=offset last press 
+;15.[bp+34]=offset enemy1 location
+;16.[bp+36]=offset enemy1_move_amount
+;17.[bp+38]=offset enemy1_movement_by_turns
+;18.[bp+40]=offset random number
 proc main_link_movement
 push bp
 mov bp,sp
 push si
 push di
 push bx
+push cx
+
+    push offset random_number
+    push offset enemy1_movement_by_turns
+    push offset enemy1_move_amount
+    push offset enemy1_location
+
+    
+    mov si,[bp+4]   ;si has the offset of link_location
+    mov di,[bp+6]   ;di recieves the offset of button_pressed
+
+    cmp [byte ptr di],'w'
+    jz cont_checks
+    cmp [byte ptr di],'a'
+    jz cont_checks
+    cmp [byte ptr di],'s'
+    jz cont_checks
+    cmp [byte ptr di],'d'
+    jz cont_checks
+
+    mov bx,[bp+32]
+    mov cx, [bp+8]   ;link 1st wanted sprite      
+    cmp [byte ptr bx],'s'
+    jnz contns
+    jmp s_no_move
+    contns:
+
+    mov cx, [bp+20]        ;link 1st wanted sprite
+    cmp [byte ptr bx],'w'
+    jnz contnw
+    jmp w_no_move
+    contnw:
+
+    mov cx, [bp+16]        ;link 1st wanted sprite
+    cmp [byte ptr bx],'d'
+    jnz contnd
+    jmp d_no_move
+    contnd:
+
+    mov cx, [bp+12]        ;link 1st wanted sprite
+    cmp [byte ptr bx],'a'
+    jnz contna 
+    jmp a_no_move
+    contna:
+    cont_checks:
+
 
     mov si,[bp+4]   ;si has the offset of link_location
     mov di,[bp+6]   ;di recieves the offset of button_pressed
@@ -584,18 +649,19 @@ push bx
     call check_hitbox_link  ;procedure that checks if link should move or not
     mov bx,[bp+28]
     mov bx,[bx]
+    mov cx, [bp+10]    ;offset link 2nd wanted sprite
 
     cmp bx,0                ;if link is not going to a clean tile he cannot move
     jz yes_moving_down
+    s_no_move:
     mov di,0                ;now link will move zero spaces
     yes_moving_down:
-
-    push [bp+10]    ;offset link 2nd wanted sprite
+   
+    push cx
     push [bp+8]     ;offset link 1st wanted sprite
     push [bp+24]    ;offsetscreen part buffer
     push di         ;amount of movement for link
     push si         ;offset link_location
-    call all_actions
     conts:
 
 
@@ -610,18 +676,19 @@ push bx
     call check_hitbox_link  ;procedure that checks if link should move or not
     mov bx,[bp+28]
     mov bx,[bx]
+    mov cx, [bp+22]    ;offset link 2nd wanted sprite
 
     cmp bx,0                ;if link is not going to a clean tile he cannot move
     jz yes_moving_up
+    w_no_move:
     mov di,0                ;now link will move zero spaces
     yes_moving_up:
 
-    push [bp+22]    ;offset link 2nd wanted sprite
+    push cx
     push [bp+20]    ;offset link 1st wanted sprite
     push [bp+24]    ;offsetscreen part buffer
     push di         ;amount of movement for link
     push si         ;offset link_location
-    call all_actions
     contw:
 
 
@@ -636,18 +703,19 @@ push bx
     call check_hitbox_link  ;procedure that checks if link should move or not
     mov bx,[bp+28]
     mov bx,[bx]
+    mov cx, [bp+18]         ;offset link 2nd wanted sprite
 
     cmp bx,0                ;if link is not going to a clean tile he cannot move
     jz yes_moving_right
+    d_no_move:
     mov di,0                ;now link will move zero spaces
     yes_moving_right:
 
-    push [bp+18]    ;offset link 2nd wanted sprite
-    push [bp+16]     ;offset link 1st wanted sprite
+    push cx
+    push [bp+16]    ;offset link 1st wanted sprite
     push [bp+24]    ;offsetscreen part buffer
     push di         ;amount of movement for link
     push si         ;offset link_location
-    call all_actions
     contd:
 
 
@@ -662,25 +730,30 @@ push bx
     call check_hitbox_link  ;procedure that checks if link should move or not
     mov bx,[bp+28]
     mov bx,[bx]
+    mov cx, [bp+14]         ;offset link 2nd wanted sprite
     
     cmp bx,0                ;if link is not going to a clean tile he cannot move
     jz yes_moving_left
+    a_no_move:
     mov di,0                ;now link will move zero spaces
     yes_moving_left:
 
-    push [bp+14]    ;offset link 2nd wanted sprite
+    push cx
     push [bp+12]    ;offset link 1st wanted sprite
     push [bp+24]    ;offsetscreen part buffer
     push di         ;amount of movement for link
     push si         ;offset link_location
-    call all_actions
     conta:
 
+
+    call all_actions
+
+pop cx
 pop bx
 pop di
 pop si
 pop bp
-ret 26
+ret 38
 endp main_link_movement
 
 ;------------------------------------------END--> Main Link Movement <--END------------------------------------------;
@@ -693,17 +766,24 @@ endp main_link_movement
 ;bp+6=link location offset
 ;bp+8=random_number
 ;bp+10=enemy_move_amount
-;bp+12=enemy movement counter (turns)
+;bp+12=enemy movement by turns (for the wanted enemy) 
 proc enemy_movement
-;this is the NON BLACKBOXED version I am writing in class due to shortage on time and missing code pieces
+push bp
+mov bp,sp
+push di
+push si
+push dx
+
+mov di,[bp+12]
+cmp [di],0
+jz no_new_movement
 
 mov di,[bp+4]       ;di recieves the location of the wanted enemy
 mov si,[bp+8]       ;si has the random number offset
 
-push si
-push 0
-push 4      ;these are the borders of the randomally generated number
-call generate_random_number 
+;push si     ;si has the random number offset
+;push 4      ;these are the borders of the randomally generated number
+;call generate_random_number 
 
 mov dx,8
 cmp [word ptr si],1
@@ -724,10 +804,9 @@ jz end_enemy_movement
 mov dx,0
 
 end_enemy_movement:
-push si
-push 0
-push 2      ;these are the borders of the randomally generated number
-call generate_random_number     
+;push si
+;push 2      ;these are the borders of the randomally generated number
+;call generate_random_number     
 mov si,[word ptr si]     ;si has the random number
 inc si
 mov di,[bp+12]  ;the aomunt of turns the enemy will move like so
@@ -739,6 +818,10 @@ no_new_movement:
 mov di,[bp+12]
 dec [byte ptr di]
 
+pop dx
+pop si
+pop di
+pop bp
 ret 10
 endp enemy_movement
 ;------------------------------------------END--> Enemy Procedures <--END------------------------------------------;
@@ -756,6 +839,10 @@ endp enemy_movement
 ;bp+8=screen part buffer offset
 ;bp+10=offset of link wanted sprite to be placed
 ;bp+12=offset of link second wanted sprite to be placed
+;bp+14=offset enemy1_location
+;bp+16=offset enemy1_move_amount
+;bp+18=offset enemy_movement_by_turns
+;bp+20=offset random number
 proc all_actions
 push bp
 mov bp,sp
@@ -772,6 +859,13 @@ call put_sprite
 push [si]            ;[si]= the actual location of link ;first part of link animation (before movement) ---->1 link
 push [bp+10]         ;the normal sprite for link
 call put_sprite
+
+push [bp+18]        ;bp+12 enemy1 movement by turns
+push [bp+16]        ;bp+10 enemy1 move amount
+push [bp+20]        ;bp+8 random_number
+push [bp+4 ]        ;bp+6 link location offset
+push [bp+14]        ;bp+4 enemy1 location offset
+call enemy_movement
 
 push 1
 call delay
@@ -801,7 +895,7 @@ pop ax
 pop di
 pop si
 pop bp
-ret 10
+ret 18
 endp all_actions
 ;-----------------------------------------END--> Frecuency Splitter <--END-----------------------------------------;
 start:
@@ -813,6 +907,25 @@ start:
     mov es, ax
     mov ax, 13h
     int 10h
+
+    mov [link_location],160
+    push [link_location]
+    push offset screen_part_buffer
+    call get_screen_part_buffer
+    push [link_location]
+    push offset link_down_1
+    call put_sprite
+
+    mov [current_hitbox_grid_pointer], offset hitbox_grid
+    mov [link_location_in_hitbox],20
+    mov [last_press],'s'
+
+    bad:
+
+    cmp [new_room_flag],1
+    jz yes_new_room
+    jmp no_new_room
+    yes_new_room:
 
     push offset hitbox_grid_pointer         ;bp+42
     push offset hitbox_grid                 ;bp+40
@@ -835,45 +948,64 @@ start:
     push offset black_tile                  ;bp+6
     push offset room_1_grid                 ;bp+4
     call implement_grid_to_room
-
-    mov [link_location],160
-    push [link_location]
-    push offset screen_part_buffer
-    call get_screen_part_buffer
-    push [link_location]
-    push offset link_down_1
-    call put_sprite
-
-    mov [current_hitbox_grid_pointer], offset hitbox_grid
-    mov [link_location_in_hitbox],20
-
-    bad:
+    mov [new_room_flag],0
+    no_new_room:
 
     mov ax,0
 
-    mov ah,0h
-    int 16h
-    ;CALLING -> main link movement
+    mov ah,1
+	int 16h
+jz keepGoing
+    mov ax,0
+
+	mov ah,0
+	int 16h
+keepGoing:
+
     mov [button_pressed],al
+
+    cmp al,'w'
+    jz yes_change_to_last_press
+    cmp al,'a'
+    jz yes_change_to_last_press
+    cmp al,'s'
+    jz yes_change_to_last_press
+    cmp al,'d'
+    jz yes_change_to_last_press
+    jmp no_change_to_last_press
+    yes_change_to_last_press:
+
+    mov [byte ptr last_press],al        ;last button that was pressed is saved only if there was a new button
+    no_change_to_last_press:
+
+    ;CALLING -> main link movement
+
+    push offset random_number           ;bp+40
+    push offset enemy1_movement_by_turns;bp+38
+    push offset enemy1_move_amount      ;bp+36
+    push offset enemy1_location         ;bp+34
+
+    push offset last_press              ;bp+32
+
     push offset link_location_in_hitbox ;bp+30
-    push offset hitbox_flag         ;bp+28
-    push offset hitbox_grid         ;bp+26
-    push offset screen_part_buffer  ;bp+24
+    push offset hitbox_flag             ;bp+28
+    push offset hitbox_grid             ;bp+26
+    push offset screen_part_buffer      ;bp+24
 
-    push offset link_up_2           ;bp+22
-    push offset link_up_1           ;bp+20
+    push offset link_up_2               ;bp+22
+    push offset link_up_1               ;bp+20
 
-    push offset link_right_2        ;bp+18
-    push offset link_right_1        ;bp+16
+    push offset link_right_2            ;bp+18
+    push offset link_right_1            ;bp+16
 
-    push offset link_left_2         ;bp+14
-    push offset link_left_1         ;bp+12
+    push offset link_left_2             ;bp+14
+    push offset link_left_1             ;bp+12
 
-    push offset link_down_2         ;bp+10
-    push offset link_down_1         ;bp+8
+    push offset link_down_2             ;bp+10
+    push offset link_down_1             ;bp+8
 
-    push offset button_pressed      ;bp+6
-    push offset link_location       ;bp+4
+    push offset button_pressed          ;bp+6
+    push offset link_location           ;bp+4
     call main_link_movement
 
 
