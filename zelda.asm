@@ -51,20 +51,21 @@ DATASEG
 ;    ⠀⠀⠀⠀⠉⢳⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⣴⡯⠋⠁⠀⠀⠀⠀
 ;    ⠀⠀⠀⠀⠀⠀⠀⠉⠢⣤⣄⣀⠀⠀⠀⠀⠀⠀⢀⣀⠮⠓⠉⠀⠀⠀⠀⠀⠀⠀
 ;    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠈⠛⠓⠂⠀⠂⠁⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-
 include "sprites.inc"
 
 screen_part_buffer db 256 dup(66)
-hitbox_grid db 1056 dup(1)
+hitbox_grid db 960 dup(0)
+current_hitbox_grid_pointer dw 0
 current_room db 1
 hitbox_flag db 0
 move_amount dw 0
 link_location dw 160
-link_location_in_hitbox dw 26
+link_location_in_hitbox dw 20
 button_pressed db 's'
 CLOCK equ es:6Ch
 enemy_movement_by_turns db 0
 enemy_move_amount dw 0
+hitbox_grid_pointer dw 0
 
 
 CODESEG
@@ -107,7 +108,7 @@ CODESEG
 ;bp+36=offset of brown staircase tile
 ;bp+38=offset of hitboxes flag
 ;bp+40=offset of hitbox grid
-
+;bp+42=offset hitbox grid pointer
 proc implement_grid_to_room
 push bp
 mov bp,sp
@@ -116,9 +117,12 @@ push di
 push ax
 push bx
 push dx
+push cx
 
     mov si, [bp+4]
     xor cx,cx
+    mov bx,[bp+42]
+    mov [byte ptr bx],0
     xor bx,bx
 
     again_grid_outer:
@@ -127,13 +131,16 @@ push dx
     xor ax,ax
 
 ;The following tiles until the next time it says its different are walkeble tiles
+    
 
     mov di,[bp+38]                  ;the offset of the hitbox flag
     mov [byte ptr di],0             ;0 means a walkable tile
 
     mov di,[bp+6]
     cmp [byte ptr si],0  ;checking if its a black tile
-    jz end_grid
+    jnz no_end_grid
+    jmp end_grid
+    no_end_grid:
 
     mov di,[bp+8]
     cmp [byte ptr si],1  ;checking if its an empty sand tile
@@ -195,7 +202,7 @@ push dx
     mov di,[bp+34]
     cmp [byte ptr si],14  ;checking if its a green staircase tile
     jz end_grid
-
+    
     mov di,[bp+36]
     cmp [byte ptr si],15  ;checking if its a brown staircase tile
     jz end_grid
@@ -206,10 +213,13 @@ push dx
     push di
     call put_sprite
 
-    ;push [bp+40]
-    ;push bx
-    ;push [bp+38]
-    ;call hitboxes_initialization
+    push [bp+40]        ;hitbox grid
+    push [bp+42]        ;hitbox grif pointer
+    push [bp+38]        ;hitbox flag
+    call hitboxes_initialization
+
+    mov di,[bp+42]              ;offset hitbox grid pointer
+    add [di],2                  ;moving on to the next "box" by increasing the hitbox grid pointer by 2 (2x2 boxes)
 
     inc si
     add bx,16
@@ -222,19 +232,22 @@ push dx
     not_again_grid:
 
     add bx,4800
+    mov di,[bp+42]
+    add [di],40                ;going down a line in order to continue in the +2 line (don't delete this think about this for a sec it works)
     inc cx
     cmp cx,12
     jz end_of_grid
     jmp again_grid_outer
     end_of_grid:
 
+pop cx
 pop dx
 pop bx
 pop ax
 pop di
 pop si
 pop bp
-ret 38
+ret 40
 endp implement_grid_to_room
 ;----------------------------------------------END--> Grid Implimating Procedure <--END----------------------------------------------;
 ;NUMBERS AND THEIR MEANING IN HITBOXES
@@ -253,9 +266,9 @@ endp implement_grid_to_room
 
 ;------------------------------------------------> Hitbox Initialization <------------------------------------------------;
 ;this procedure recives:
-;bp+4 = offset of the hitboxes grid
-;bp+6 = location we are at
-;bp+8 = offset of hitbox flag 
+;bp+4 = offset of the hitbox flag
+;bp+6 = offset hitbox grid pointer
+;bp+8 = offset of hitbox grid
 proc hitboxes_initialization
 push bp
 mov bp,sp
@@ -266,25 +279,22 @@ push ax
 push cx
 push bx
 
-    mov si,[bp+4]
-    mov ax,[bp+6]
-    mov di,16
-    div di
-    add si,ax
-    mov di,[bp+8]
-    mov di,[di]
+    mov ax,[bp+8]                ;offset hitbox grid
+    mov si,[bp+6]                ;hitbox grid pointer
+    add ax,[si]                  ;ax now has the correct location in hitbox area
+    mov bx,[bp+4]                ;offset of hitbox flag
+    mov bl,[byte ptr bx]         ;bx now holds the information inside of the hitbox flag
+    mov si,ax
+    
+    ;mov si, offset hitbox_grid
+    ;add si, [hitbox_grid_pointer]
+    ;mov bl, [hitbox_flag]
 
+    mov [byte ptr si],bl
+    mov [byte ptr si+1],bl
+    mov [byte ptr si+40],bl
+    mov [byte ptr si+41],bl       ;the four squeres recive a number
     mov cx,2
-hitbox_i_loop_outer:
-    xor bx,bx
-hitbpx_i_loop_inner:
-    mov [si],di
-    inc si
-    inc bx
-    cmp bx,2
-    jz hitbpx_i_loop_inner
-    add si,44
-    loop hitbox_i_loop_outer
 
 pop bx
 pop cx
@@ -295,6 +305,7 @@ pop si
 pop bp
 ret 6
 endp hitboxes_initialization
+
 ;----------------------------------------------END--> Hitbox Initialization <--END----------------------------------------------;
 ;HITBOX FLAG MEANINGS
 ;0 - NOTHING
@@ -315,34 +326,39 @@ push dx
 push ax
 push bx
 
-    mov si,[bp+4]       ;ax recieves the location of link on the screen
+    mov si,[bp+4]       ;si recieves the location of link on the hitbox area
     mov ax,[si]
-    add ax,[bp+10]      ;ax now has the location of link in the hitbox area
+    add ax,[bp+10]      ;ax now has the location of link in the hitbox area (intended new location)
     mov si,[bp+6]       ;offset of the hitbox grid
     add si,ax           ;si now has the location of link in the hitbox area
 
     mov di,[bp+8]       ;di now has the hitbox flag offset
 
-    mov ax,1            ;the value the hitbox flag will recieve
+    mov al,1            ;the value the hitbox flag will recieve
     cmp [byte ptr si],1          ;the same one
     jz end_hitbox_flag
-    cmp [byte ptr si-44],1       ;the one under
+    cmp [byte ptr si+40],1       ;the one under
     jz end_hitbox_flag
-    cmp [byte ptr si+2],1        ;the one right
+    cmp [byte ptr si+1],1        ;the one right
     jz end_hitbox_flag
-
-    mov ax,2            ;the value the hitbox flag will recieve
-    cmp [byte ptr si],1          ;the same one
-    jz end_hitbox_flag
-    cmp [byte ptr si-44],2       ;the one under
-    jz end_hitbox_flag
-    cmp [byte ptr si+2],2        ;the one right
+    cmp [byte ptr si+41],1        ;the one down right
     jz end_hitbox_flag
 
-    mov ax,0            ;the value the hitbox flag will recieve - in this case its just walkable land
+    mov aL,2            ;the value the hitbox flag will recieve
+    cmp [byte ptr si],2          ;the same one
+    jz end_hitbox_flag
+    cmp [byte ptr si-40],2       ;the one under
+    jz end_hitbox_flag
+    cmp [byte ptr si+1],2        ;the one right
+    jz end_hitbox_flag
 
+    mov al,0            ;the value the hitbox flag will recieve - in this case its just walkable land
+    mov si,[bp+4]       ;offset link location in hitbox area
+    mov bx,[bp+10]      ;amount of movement for link
+    add [word ptr si],bx         ;updates the location of link in the hitbox area
     end_hitbox_flag:
     mov [byte ptr di],al         ;the hitbox flag now has the correct value
+    
 
 pop bx    
 pop ax
@@ -561,7 +577,7 @@ push bx
     jnz conts
 
     mov di,2560
-    push 44
+    push 40
     push [bp+28]
     push [bp+26]
     push [bp+30]
@@ -587,7 +603,7 @@ push bx
     jnz contw
 
     mov di,-2560
-    push -44
+    push -40
     push [bp+28]
     push [bp+26]
     push [bp+30]
@@ -613,7 +629,7 @@ push bx
     jnz contd
 
     mov di,8
-    push 2
+    push 1
     push [bp+28]
     push [bp+26]
     push [bp+30]
@@ -639,7 +655,7 @@ push bx
     jnz conta
 
     mov di,-8
-    push -2
+    push -1
     push [bp+28]
     push [bp+26]
     push [bp+30]
@@ -798,6 +814,7 @@ start:
     mov ax, 13h
     int 10h
 
+    push offset hitbox_grid_pointer         ;bp+42
     push offset hitbox_grid                 ;bp+40
     push offset hitbox_flag                 ;bp+38
     push offset brown_staircase_tile        ;bp+36
@@ -827,9 +844,10 @@ start:
     push offset link_down_1
     call put_sprite
 
+    mov [current_hitbox_grid_pointer], offset hitbox_grid
+    mov [link_location_in_hitbox],20
 
     bad:
-
 
     mov ax,0
 
