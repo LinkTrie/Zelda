@@ -469,16 +469,16 @@ push bx
     mov si,[bp+4]   ;si points to the hitbox grid
     add si,[bp+6]   ;si has the current location of link inside of the hitbox grid
 
-    mov [word ptr si], 0
-    mov [word ptr si+1], 0
-    mov [word ptr si+40], 0
-    mov [word ptr si+41], 0
+    mov [byte ptr si], 0
+    mov [byte ptr si+1], 0
+    mov [byte ptr si+40], 0
+    mov [byte ptr si+41], 0
 
     add si,[bp+8]
-    mov [word ptr si], 3
-    mov [word ptr si+1], 3
-    mov [word ptr si+40], 3
-    mov [word ptr si+41], 3
+    mov [byte ptr si], 3
+    mov [byte ptr si+1], 3
+    mov [byte ptr si+40], 3
+    mov [byte ptr si+41], 3
 
 pop bx
 pop di
@@ -502,18 +502,18 @@ push di
 push bx
 
     mov si,[bp+4]   ;si points to the hitbox grid
-    add si,[bp+6]   ;si has the current location of link inside of the hitbox grid
+    add si,[bp+6]   ;si has the current location of the enemy inside of the hitbox grid
 
-    mov [word ptr si], 0
-    mov [word ptr si+1], 0
-    mov [word ptr si+40], 0
-    mov [word ptr si+41], 0
+    mov [byte ptr si], 0
+    mov [byte ptr si+1], 0
+    mov [byte ptr si+40], 0
+    mov [byte ptr si+41], 0
 
     add si,[bp+8]
-    mov [word ptr si], 2
-    mov [word ptr si+1], 2
-    mov [word ptr si+40], 2
-    mov [word ptr si+41], 2
+    mov [byte ptr si], 2
+    mov [byte ptr si+1], 2
+    mov [byte ptr si+40], 2
+    mov [byte ptr si+41], 2
 
 pop bx
 pop di
@@ -558,32 +558,32 @@ push bx
     jz end_hitbox_flag
     cmp [byte ptr si+1],1        ;the one right
     jz end_hitbox_flag
-    cmp [byte ptr si+41],1        ;the one down right
+    cmp [byte ptr si+41],1       ;the one down right
     jz end_hitbox_flag
 
     mov al,1            ;the value the hitbox flag will recieve
     cmp [byte ptr si],2          ;the same one
     jz end_hitbox_flag
-    cmp [byte ptr si-40],2       ;the one under
+    cmp [byte ptr si+40],2       ;the one under
     jz end_hitbox_flag
     cmp [byte ptr si+1],2        ;the one right
+    jz end_hitbox_flag
+    cmp [byte ptr si+41],2       ;the one down right
     jz end_hitbox_flag
 
     mov al,0            ;the value the hitbox flag will recieve - in this case its just walkable land
     mov si,[bp+4]       ;offset link location in hitbox area
     mov bx,[bp+10]      ;amount of movement for link
     add [word ptr si],bx         ;updates the location of link in the hitbox area
-    end_hitbox_flag:
-    mov [byte ptr di],al         ;the hitbox flag now has the correct value
 
-    cmp al,0
-    jnz no_update_link
-    push [bp+10];movement in hitbox for link
     mov si,[bp+4]
-    push si     ;bp+6 link REAL location in hitbox grid
+    push [bp+10];movement in hitbox for link
+    push [si]     ;bp+6 link REAL location in hitbox grid
     push [bp+6] ;bp+4 hitbox grid
     call update_hitbox_link
-    no_update_link:
+
+    end_hitbox_flag:
+    mov [byte ptr di],al         ;the hitbox flag now has the correct value
     
 
 pop bx    
@@ -654,21 +654,19 @@ push bx
     jz end_hitbox_flag_enemy
 
 
+    mov si,[bp+4]
+    push [bp+10];movement in hitbox for enemy
+    push [si]     ;bp+6 enemy REAL location in hitbox grid
+    push [bp+6] ;bp+4 hitbox grid
+    call update_hitbox_enemy
+    
     mov al,0            ;the value the hitbox flag will recieve - in this case its just walkable land
     mov si,[bp+4]       ;offset enemy location in hitbox area
     mov bx,[bp+10]      ;amount of movement for link
     add [word ptr si],bx         ;updates the location of link in the hitbox area
+
     end_hitbox_flag_enemy:
     mov [byte ptr di],al         ;the hitbox flag now has the correct value
-
-    cmp al,0
-    jnz no_update_enemy
-    push [bp+10];movement in hitbox for enemy
-    mov si,[bp+4]
-    push si     ;bp+6 enemy REAL location in hitbox grid
-    push [bp+6] ;bp+4 hitbox grid
-    call update_hitbox_enemy
-    no_update_enemy:
 
 
 pop bx    
@@ -1553,11 +1551,12 @@ start:
 
     mov [link_location_in_hitbox],20
     mov [last_press],'s'
+
     mov [enemy1_location],30880
     mov [enemy1_location_in_hitbox],500
 
-    mov [enemy2_location],30880
-    mov [enemy2_location_in_hitbox],500
+    mov [enemy2_location],30896
+    mov [enemy2_location_in_hitbox],502
     
     mov [enemy3_location],30880
     mov [enemy3_location_in_hitbox],500
@@ -1604,6 +1603,13 @@ start:
     ;call implement_enemy_to_room
     mov [new_room_flag],0
     no_new_room:
+
+    ;mov si,offset hitbox_grid   ;si points to the hitbox grid
+    ;add si,[enemy1_location_in_hitbox]   ;si has the current location of the enemy inside of the hitbox grid
+    ;mov [byte ptr si], 2
+    ;mov [byte ptr si+1], 2
+    ;mov [byte ptr si+40], 2
+    ;mov [byte ptr si+41], 2
 
     mov ax,0
 
