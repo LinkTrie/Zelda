@@ -561,7 +561,7 @@ push bx
     cmp [byte ptr si+41],1        ;the one down right
     jz end_hitbox_flag
 
-    mov aL,2            ;the value the hitbox flag will recieve
+    mov al,1            ;the value the hitbox flag will recieve
     cmp [byte ptr si],2          ;the same one
     jz end_hitbox_flag
     cmp [byte ptr si-40],2       ;the one under
@@ -576,11 +576,14 @@ push bx
     end_hitbox_flag:
     mov [byte ptr di],al         ;the hitbox flag now has the correct value
 
+    cmp al,0
+    jnz no_update_link
     push [bp+10];movement in hitbox for link
     mov si,[bp+4]
     push si     ;bp+6 link REAL location in hitbox grid
     push [bp+6] ;bp+4 hitbox grid
     call update_hitbox_link
+    no_update_link:
     
 
 pop bx    
@@ -658,12 +661,15 @@ push bx
     end_hitbox_flag_enemy:
     mov [byte ptr di],al         ;the hitbox flag now has the correct value
 
+    cmp al,0
+    jnz no_update_enemy
     push [bp+10];movement in hitbox for enemy
     mov si,[bp+4]
     push si     ;bp+6 enemy REAL location in hitbox grid
     push [bp+6] ;bp+4 hitbox grid
     call update_hitbox_enemy
-    
+    no_update_enemy:
+
 
 pop bx    
 pop ax
@@ -901,6 +907,18 @@ endp generate_random_number
 ;23.[bp+50]=offset enemy2_movement_by_turns
 ;24.[bp+52]=offset enemy2_move_amount_in_hitbox
 ;25.[bp+54]=offset enemy2_location_in_hitbox
+;26.[bp+56]=offset enemy3_location 
+;27.[bp+58]=offset enemy3_move_amount   
+;28.[bp+60]=offset enemy3_movement_by_turns 
+;29.[bp+62]=offset enemy3_move_amount_in_hitbox 
+;30.[bp+64]=offset enemy3_location_in_hitbox 
+;31.[bp+66]=offset enemy4_location 
+;32.[bp+68]=offset enemy4_move_amount   
+;33.[bp+70]=offset enemy4_movement_by_turns 
+;34.[bp+72]=offset enemy4_move_amount_in_hitbox 
+;35.[bp+74]=offset enemy4_location_in_hitbox 
+;36.[bp+76]=offset zol1
+;37.[bp+78]=offset zol2
 proc main_link_movement
 push bp
 mov bp,sp
@@ -908,18 +926,33 @@ push si
 push di
 push bx
 push cx
-    
-    
+
+    push [bp+78]    ;bp+62
+    push [bp+76]    ;bp+60
+
+    push [bp+74]    ;bp+58    
+    push [bp+72]    ;bp+56
+    push [bp+70]    ;bp+54    
+    push [bp+68]    ;bp+52
+    push [bp+66]    ;bp+50    
+
+    push [bp+64]    ;bp+48
+    push [bp+62]    ;bp+46
+    push [bp+60]    ;bp+44      enemy3
+    push [bp+58]    ;bp+42    
+    push [bp+56]    ;bp+40 
+
     push [bp+54]    ;bp+38
     push [bp+52]    ;bp+36
-    push [bp+50]    ;bp+34
+    push [bp+50]    ;bp+34      enemy2
     push [bp+48]    ;bp+32
-    push [bp+46]    ;bp+30   
+    push [bp+46]    ;bp+30
+
     push [bp+28]    ;bp+28 hitbox flag
     push [bp+26]    ;bp+26 hitbox grid
     push [bp+44]    ;bp+24
     push [bp+42]    ;bp+22
-    push [bp+40]    ;bp+20
+    push [bp+40]    ;bp+20  random number and the rest are enemy1
     push [bp+38]    ;bp+18
     push [bp+36]    ;bp+16
     push [bp+34]    ;bp+14
@@ -1083,7 +1116,7 @@ pop bx
 pop di
 pop si
 pop bp
-ret 52
+ret 76
 endp main_link_movement
 
 ;------------------------------------------END--> Main Link Movement <--END------------------------------------------;
@@ -1227,6 +1260,18 @@ endp enemy_movement_seek
 ;bp+34=offset enemy2_movement_by_turns
 ;bp+36=offset enemy2_move_amount_in_hitbox
 ;bp+38=offset enemy2_location_in_hitbox
+;bp+40=offset enemy3_location 
+;bp+42=offset enemy3_move_amount
+;bp+44=offset enemy3_movement_by_turns
+;bp+46=offset enemy3_move_amount_in_hitbox 
+;bp+48=offset enemy3_location_in_hitbox 
+;bp+50=offset enemy4_location 
+;bp+52=offset enemy4_move_amount
+;bp+54=offset enemy4_movement_by_turns
+;bp+56=offset enemy4_move_amount_in_hitbox 
+;bp+58=offset enemy4_location_in_hitbox 
+;bp+60=offset zol1
+;bp+62=offset zol2
 proc all_actions
 push bp
 mov bp,sp
@@ -1265,7 +1310,7 @@ push bx
     call put_sprite
 
     push [di]
-    push [bp+10]        ;second wanted sprite for enemy1
+    push [bp+60]        ;second wanted sprite for enemy1
     call put_sprite
 
 ;-enemy 1 END
@@ -1279,10 +1324,24 @@ push bx
 
     mov di,[bp+30]
     push [di]
-    push [bp+10]        ;second wanted sprite for enemy2
+    push [bp+60]        ;second wanted sprite for enemy2
     call put_sprite
 
 ;-enemy2 END
+
+;-enemy3
+
+    mov di,[bp+40]      ;enemy3 location is updated
+    push [di]
+    push [bp+8]         ;screen part buffer
+    call put_sprite
+
+    mov di,[bp+40]
+    push [di]
+    push [bp+60]        ;second wanted sprite for enemy3
+    call put_sprite
+
+;-enemy3 END
 ;-------------------------;
     push 1              ;end of phase 1
     call delay          ;start of phase 2
@@ -1335,7 +1394,7 @@ push bx
 
     mov di,[bp+14]
     push [di]
-    push [bp+10]        ;second wanted sprite for enemy1
+    push [bp+62]        ;second wanted sprite for enemy1
     call put_sprite
 
 ;-enemy1 END
@@ -1366,10 +1425,24 @@ push bx
 
     mov di,[bp+30]
     push [di]
-    push [bp+10]        ;second wanted sprite for enemy1
+    push [bp+62]        ;second wanted sprite for enemy1
     call put_sprite
 
 ;-enemy2 END
+
+;-enemy3
+
+    mov di,[bp+40]      ;enemy3 location is updated
+    push [di]
+    push [bp+8]         ;screen part buffer
+    call put_sprite
+
+    mov di,[bp+40]
+    push [di]
+    push [bp+62]        ;second wanted sprite for enemy3
+    call put_sprite
+
+;enemy3 END
 ;-------------------------;
     push 1              ;end of phase 2
     call delay          ;start of phase 3
@@ -1394,7 +1467,7 @@ push bx
     call put_sprite
 
     push [di]
-    push [bp+10]        ;second wanted sprite for enemy1
+    push [bp+60]        ;second wanted sprite for enemy1
     call put_sprite
 
 ;-enemy1 END
@@ -1408,17 +1481,56 @@ push bx
 
     mov di,[bp+30]
     push [di]
-    push [bp+10]        ;second wanted sprite for enemy2
+    push [bp+60]        ;second wanted sprite for enemy2
     call put_sprite
 
 ;enemy2 END
+
+;-enemy3
+
+    push [bp+46]        ;bp+14 enemy3 move amount in hitbox
+    push [bp+44]        ;bp+12 enemy3 movement by turns
+    push [bp+42]        ;bp+10 enemy3 move amount
+    push [bp+20]        ;bp+8 random_number
+    push [bp+4]         ;bp+6 link location offset
+    push [bp+40]        ;bp+4 enemy3 location offset
+    call enemy_movement_random
+
+    mov di,[bp+40]      ;enemy3 location is updated
+    push [di]
+    push [bp+8]         ;screen part buffer
+    call put_sprite
+
+    mov bx,[bp+46]
+    push [word ptr bx]      ;bp+10 enemy3 *true* move amount in hitbox
+    push [bp+28]            ;bp+8 hitbox flag
+    push [bp+26]            ;bp+6 hitbox grid
+    push [bp+48]            ;bp+4 enemy3 location in hitbox
+    call check_hitbox_enemy
+
+    mov bx,[bp+28]  ;hitbox flag
+    mov bl,[byte ptr bx]
+    cmp bl,0
+    jnz no_move_enemy3
+
+    mov bx,[bp+42]     ;enemy3 move amount
+    mov bx,[word ptr bx]
+    add [word ptr di],bx
+    no_move_enemy3:
+
+    mov di,[bp+40]
+    push [di]
+    push [bp+60]        ;second wanted sprite for enemy3
+    call put_sprite
+
+;-enemy3 END
 
 pop bx
 pop ax
 pop di
 pop si
 pop bp
-ret 36
+ret 60
 endp all_actions
 ;-----------------------------------------END--> Frecuency Splitter <--END-----------------------------------------;
 start:
@@ -1446,6 +1558,9 @@ start:
 
     mov [enemy2_location],30880
     mov [enemy2_location_in_hitbox],500
+    
+    mov [enemy3_location],30880
+    mov [enemy3_location_in_hitbox],500
 
     bad:
 
@@ -1518,6 +1633,21 @@ keepGoing:
     no_change_to_last_press:
 
     ;CALLING -> main link movement
+    push offset zol2                            ;bp+78
+    push offset zol1                            ;bp+76
+
+    push offset enemy4_location_in_hitbox       ;bp+74
+    push offset enemy4_move_amount_in_hitbox    ;bp+72
+    push offset enemy4_movement_by_turns        ;bp+70
+    push offset enemy4_move_amount              ;bp+68
+    push offset enemy4_location                 ;bp+66
+
+    push offset enemy3_location_in_hitbox       ;bp+64
+    push offset enemy3_move_amount_in_hitbox    ;bp+62
+    push offset enemy3_movement_by_turns        ;bp+60
+    push offset enemy3_move_amount              ;bp+58
+    push offset enemy3_location                 ;bp+56
+
     push offset enemy2_location_in_hitbox       ;bp+54
     push offset enemy2_move_amount_in_hitbox    ;bp+52
     push offset enemy2_movement_by_turns        ;bp+50
