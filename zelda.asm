@@ -71,6 +71,11 @@ link_hp_grace db 0
 button_pressed db 's'
 last_press db 0
 
+moving_down equ 1
+moving_up equ 2
+moving_right equ 3
+moving_left equ 4
+
 CLOCK equ es:6Ch
 hitbox_grid_pointer dw 0
 
@@ -410,6 +415,23 @@ pop bp
 ret 20
 endp implement_enemy_to_room
 ;----------------------------------------------END--> Enemy Implimating Procedure <--END----------------------------------------------;
+;------------------magic------------------;
+
+proc clearkeyboardbuffer
+push ax
+push es
+
+	mov	ax, 0000h
+	mov	es, ax                                  ;de magic
+	mov	[word ptr es:041ah], 041eh
+	mov	[word ptr es:041ch], 041eh				; Clears keyboard buffer
+
+pop	es
+pop	ax
+ret
+endp clearkeyboardbuffer
+
+;----------------END--> magic <--END----------------;
 
 ;------------------------------------------------> Display Health To Screen <------------------------------------------------;
 ;this procedure revieves:
@@ -852,6 +874,50 @@ endp put_sprite
 
 ;------------------------------------------------END--> Sprite Procedures <--END------------------------------------------------;
 
+;this proc recives:
+;[bp+4] = offset of the wanted sprite that is 32x32
+;[bp+6] = sprites location in extraseg
+proc put_sprite_32
+push bp
+mov bp,sp
+push dx
+push cx
+push bx
+push si
+push ax
+
+    xor ax,ax
+    mov si,[bp+4]    ;wanted sprite
+    mov bx,[bp+6]    ;current location of the sprite
+    mov dx,32
+lop2_32:
+    mov cx,32
+lop_32:
+    mov ah,[si]
+    cmp ah,23
+    je skip_32
+    mov [es:bx],ah
+skip_32:
+    inc si
+    inc bx
+    loop lop_32
+    add bx,320
+    sub bx,32
+    dec dx
+    cmp dx,0
+    jnz lop2_32
+
+pop ax
+pop si
+pop bx
+pop cx
+pop dx
+pop bp
+ret 4
+endp put_sprite_32
+
+;------------------------------------------------END--> Sprite Procedures <--END------------------------------------------------;
+
 ;=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=> CHANGE BETWEEN IMPORTANT PROCEDURE AREAS <=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=;
 
 ;--------------------------------------------General Perpose Procedures--------------------------------------------;
@@ -1001,6 +1067,15 @@ endp generate_random_number
 ;37.[bp+78]=offset zol2
 ;38.[bp+80]=offset link_hp
 ;39.[bp+82]=offset link_hp_grace
+;40.[bp+84]=offset msword down 1
+;41.[bp+86]=offset msword down 2
+;42.[bp+88]=offset msword left 1
+;43.[bp+90]=offset msword left 2
+;44.[bp+92]=offset msword right 1
+;45.[bp+94]=offset msword right 2
+;46.[bp+96]=offset msword up 1
+;47.[bp+98]=offset msword up 2
+;48.[bp+100]=offset move amount
 proc main_link_movement
 push bp
 mov bp,sp
@@ -1008,6 +1083,20 @@ push si
 push di
 push bx
 push cx
+
+    push [bp+100]   ;bp+84
+
+    push [bp+98]    ;bp+82
+    push [bp+96]    ;bp+80
+
+    push [bp+94]    ;bp+78
+    push [bp+92]    ;bp+76
+
+    push [bp+90]    ;bp+74
+    push [bp+88]    ;bp+72
+
+    push [bp+86]    ;bp+70
+    push [bp+84]    ;bp+68
 
     push [bp+82]    ;bp+66
     push [bp+80]    ;bp+64
@@ -1054,8 +1143,9 @@ push cx
     cmp [byte ptr di],'d'
     jz cont_checks
 
+
     mov bx,[bp+32]
-    mov cx, [bp+8]   ;link 1st wanted sprite      
+    mov cx, [bp+8]   ;link 1st wanted sprite     
     cmp [byte ptr bx],'s'
     jnz contns
     jmp s_no_move
@@ -1104,6 +1194,8 @@ push cx
     jz yes_moving_down
     s_no_move:
     mov di,0                ;now link will move zero spaces
+    mov bx,2560
+    mov [move_amount],moving_down
     yes_moving_down:
    
     push cx
@@ -1133,6 +1225,8 @@ push cx
     jz yes_moving_up
     w_no_move:
     mov di,0                ;now link will move zero spaces
+    mov bx,-2560
+    mov [move_amount],moving_up
     yes_moving_up:
 
     push cx
@@ -1162,6 +1256,8 @@ push cx
     jz yes_moving_right
     d_no_move:
     mov di,0                ;now link will move zero spaces
+    mov bx,8
+    mov [move_amount], moving_right
     yes_moving_right:
 
     push cx
@@ -1191,6 +1287,8 @@ push cx
     jz yes_moving_left
     a_no_move:
     mov di,0                ;now link will move zero spaces
+    mov bx,-8
+    mov [move_amount], moving_left
     yes_moving_left:
 
     push cx
@@ -1200,16 +1298,100 @@ push cx
     push si         ;offset link_location
     conta:
 
+    mov di,[bp+6]
+    cmp [byte ptr di],32    ;32 is space, space is for attacking
+    jnz no_attack_now
+
+    mov di,[bp+30]
+    add [word ptr di],bx
+    mov di,0
+    push [bp+82]
+    push [bp+80]
+    push 40
+    push [bp+28]
+    push [bp+26]
+    push [bp+30]
+    call check_hitbox_link  ;procedure that checks if link should move or not
+    sub [word ptr di],bx
+
+    mov bx,[bp+28]
+    cmp [byte ptr bx],1
+    jz no_attack_now
+    mov [attack_flag],1
+    no_attack_now:
+
+
     call all_actions
+
+    mov [attack_flag],0
 
 pop cx
 pop bx
 pop di
 pop si
 pop bp
-ret 80
+ret 98
 endp main_link_movement
 ;------------------------------------------END--> Main Link Movement <--END------------------------------------------;
+
+;--------------------------------------------Link Attack--------------------------------------------;
+;bp+4=offset link location
+;bp+6=offset move amount
+;bp+8=offset current msword down 
+;bp+10=offset current msword left 
+;bp+12=offset current msword right 
+;bp+14=offset current msword up 
+proc link_attack
+push bp
+mov bp,sp
+push si
+
+    mov si,[bp+6]
+    cmp [word ptr si],moving_down
+    jz cont_down
+    mov si,[bp+4]
+    mov si,[word ptr si]
+    add si,5160
+    push si
+    push [bp+8]
+    call put_sprite_32
+    cont_down:
+
+    cmp [word ptr si],moving_up
+    jz cont_down
+    mov si,[bp+4]
+    mov si,[word ptr si]
+    sub si,5120
+    push si
+    push [bp+14]
+    call put_sprite_32
+    cont_up:
+
+    cmp [word ptr si],moving_right
+    jz cont_down
+    mov si,[bp+4]
+    mov si,[word ptr si]
+    sub si,16
+    push si
+    push [bp+12]
+    call put_sprite_32
+    cont_right:
+
+    cmp [word ptr si],moving_left
+    jz cont_down
+    mov si,[bp+4]
+    mov si,[word ptr si]
+    ;add si,-16
+    push si
+    push [bp+10]
+    call put_sprite_32
+    cont_left:
+
+pop si
+pop bp
+ret 12
+endp link_attack
+;------------------------------------------END--> Link Attack <--END------------------------------------------;
 
 ;(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-LESSER CHANGES BETWEEN PROCEDURE AREAS-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--);
 
@@ -1280,6 +1462,7 @@ push cx
     mov di,[bp+14]
     mov [word ptr di],cx    ;changing the movement in the hitbox grid
     no_new_movement:
+
 
     mov di,[bp+12]
     dec [byte ptr di]
@@ -1364,6 +1547,15 @@ endp enemy_movement_seek
 ;bp+62=offset zol2
 ;bp+64=offset link_hp
 ;bp+66=offset link_hp_grace
+;bp+68=offset msword down 1
+;bp+70=offset msword down 2
+;bp+72=offset msword left 1
+;bp+74=offset msword left 2
+;bp+76=offset msword right 1
+;bp+78=offset msword right 2
+;bp+80=offset msword up 1
+;bp+82=offset msword up 2
+;bp+84=offset move amount
 proc all_actions
 push bp
 mov bp,sp
@@ -1379,10 +1571,25 @@ push bx
     push [si]            ;putting the screen part buffer on the screen in links location     
     push [bp+8]          ;screen part buffer
     call put_sprite
+   
+    ;cmp [attack_flag],1
+    ;jz attack_phase_1
 
     push [si]            ;[si]= the actual location of link ;first part of link animation (before movement) ---->1 link
     push [bp+10]         ;the normal sprite for link
     call put_sprite
+    ;jmp no_attack_phase_1
+
+    ;attack_phase_1:
+    ;push [bp+68]
+    ;push [bp+72]
+    ;push [bp+76]
+    ;push [bp+80] 
+    ;push [bp+84]
+    ;push [bp+4]
+;
+    ;call link_attack
+    ;no_attack_phase_1:
 
 ;-link END
 
@@ -1443,12 +1650,27 @@ push bx
     push [si]            ;[si]= the actual location of link ;putting the screen part buffer on the screen in links location     
     push [bp+8]          ;screen part buffer
     call put_sprite
+  
+    ;cmp [attack_flag],1
+    ;jz attack_phase_2
 
     mov di,[bp+6]
     add [si],di          ;moving link with the desired amount
     push [si]            ;[si]= the actual location of link ;second part of link animation (after movement) ---->2 link
     push [bp+12]         ;the animated sprite for link
     call put_sprite
+    ;jmp no_attack_phase_2
+
+    ;attack_phase_2:
+    ;push [bp+68]
+    ;push [bp+72]
+    ;push [bp+76]
+    ;push [bp+80] 
+    ;push [bp+84]
+    ;push [bp+4]
+;
+    ;call link_attack
+    ;no_attack_phase_2:
 
 ;-link END
 
@@ -1545,6 +1767,9 @@ push bx
 ;-------------------------;
 ;-link
 
+    ;cmp [attack_flag],1
+    ;jz attack_phase_3
+
     push [si]            ;[si]= the actual location of link ;putting the screen part buffer on the screen in links location     
     push [bp+8]          ;screen part buffer
     call put_sprite
@@ -1552,6 +1777,18 @@ push bx
     push [si]            ;[si]= the actual location of link ;third part of link animation (before movement) ---->3 link
     push [bp+10]         ;the normal sprite for link
     call put_sprite
+    ;jmp no_attack_phase_3
+
+    ;attack_phase_3:
+    ;push [bp+68]
+    ;push [bp+72]
+    ;push [bp+76]
+    ;push [bp+80] 
+    ;push [bp+84]
+    ;push [bp+4]
+;
+    ;call link_attack
+    ;no_attack_phase_3:
 
 ;-link END
 
@@ -1628,7 +1865,7 @@ pop ax
 pop di
 pop si
 pop bp
-ret 64
+ret 82
 endp all_actions
 ;-----------------------------------------END--> Frecuency Splitter <--END-----------------------------------------;
 start:
@@ -1756,6 +1993,7 @@ jz keepGoing
 	int 16h
 keepGoing:
 
+    call clearkeyboardbuffer
     mov [button_pressed],al
 
     cmp al,'w'
@@ -1778,6 +2016,20 @@ keepGoing:
     call display_health_to_screen
 
     ;CALLING -> main link movement
+    push offset move_amount                     ;bp+100
+
+    push offset msword_up_2                     ;bp+98
+    push offset msword_up_1                     ;bp+96
+
+    push offset msword_right_2                  ;bp+94
+    push offset msword_right_1                  ;bp+92
+
+    push offset msword_left_2                   ;bp+90
+    push offset msword_left_1                   ;bp+88
+
+    push offset msword_down_2                   ;bp+86
+    push offset msword_down_1                   ;bp+84
+
     push offset link_hp_grace                   ;bp+82
     push offset link_hp                         ;bp+80
     push offset zol2                            ;bp+78
@@ -1831,6 +2083,7 @@ keepGoing:
     push offset button_pressed                  ;bp+6
     push offset link_location                   ;bp+4
     call main_link_movement
+
 
     cmp [link_hp],0
     jnz nodie
