@@ -425,7 +425,7 @@ push si
 push ax
 push di
 
-    mov bl,8
+    mov bl,9
 
     mov cx,248
     place_empty_hearts:
@@ -673,6 +673,8 @@ endp check_hitbox_link
 ;bp+6=offset hitbox grid
 ;bp+8=offset hitbox flag
 ;bp+10=enemy movement in hitbox
+;bp+12=link hp
+;bp+14=link hp grace
 proc check_hitbox_enemy
 push bp
 mov bp,sp
@@ -716,7 +718,7 @@ push bx
     ;cmp [byte ptr si+1],4        ;the one right
     ;jz end_hitbox_flag_enemy
     
-    mov al,1            ;the value the hitbox flag will recieve
+    mov al,3            ;the value the hitbox flag will recieve
     cmp [byte ptr si],3          ;the same one
     jz end_hitbox_flag_enemy
     cmp [byte ptr si-40],3       ;the one under
@@ -739,8 +741,14 @@ push bx
     end_hitbox_flag_enemy:
     mov [byte ptr di],al         ;the hitbox flag now has the correct value
 
-    
-
+    cmp al,3
+    jnz nohit_tolink
+    mov si,[bp+14]
+    cmp [byte ptr si],0
+    jnz nohit_tolink
+    mov si,[bp+12]
+    dec [byte ptr si]
+    nohit_tolink:
 
 pop bx    
 pop ax
@@ -748,7 +756,7 @@ pop dx
 pop di
 pop si
 pop bp
-ret 8
+ret 12
 endp check_hitbox_enemy
 ;----------------------------------------------END--> Check Hitbox Enemy <--END----------------------------------------------;
 
@@ -1459,6 +1467,8 @@ push bx
     push [bp+8]         ;screen part buffer
     call put_sprite
 
+    push [bp+66]
+    push [bp+64]
     mov bx,[bp+22]
     push [word ptr bx]      ;bp+10 enemy1  true move amount in hitbox
     push [bp+28]            ;bp+8 hitbox flag
@@ -1490,6 +1500,8 @@ push bx
     push [bp+8]         ;screen part buffer
     call put_sprite
 
+    push [bp+66]
+    push [bp+64]
     mov bx,[bp+36]
     push [word ptr bx]      ;bp+10 enemy2 true move amount in hitbox
     push [bp+28]            ;bp+8 hitbox flag
@@ -1585,6 +1597,8 @@ push bx
     push [bp+8]         ;screen part buffer
     call put_sprite
 
+    push [bp+66]
+    push [bp+64]
     mov bx,[bp+46]
     push [word ptr bx]      ;bp+10 enemy3 true move amount in hitbox
     push [bp+28]            ;bp+8 hitbox flag
