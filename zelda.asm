@@ -109,11 +109,6 @@ enemy4_hp db 1
 
 random_number dw 0
 
-;bp+4=wanted enemy location offset
-;bp+6=link location offset
-;bp+8=random_number
-;bp+10=enemy_move_amount
-;bp+12=enemy movement counter (turns)
 CODESEG
 ;------------------------------------------------Room Defining Procedures------------------------------------------------;
 ;IMPORTANT NOTES FOR ALL THESE PROCS:
@@ -421,13 +416,13 @@ proc clearkeyboardbuffer
 push ax
 push es
 
-	mov	ax, 0000h
-	mov	es, ax                                  ;de magic
-	mov	[word ptr es:041ah], 041eh
-	mov	[word ptr es:041ch], 041eh				; Clears keyboard buffer
+    mov ax, 0000h
+    mov es, ax                                  ;de magic
+    mov [word ptr es:041ah], 041eh
+    mov [word ptr es:041ch], 041eh              ; Clears keyboard buffer
 
-pop	es
-pop	ax
+pop es
+pop ax
 ret
 endp clearkeyboardbuffer
 
@@ -965,8 +960,8 @@ push es
     mov ax, 40h
     mov es, ax
 
-	xor ax,ax
-	mov ax,[CLOCK]
+    xor ax,ax
+    mov ax,[CLOCK]
     mov di,ax
     inc ax
 
@@ -1075,7 +1070,7 @@ endp generate_random_number
 ;45.[bp+94]=offset msword right 2
 ;46.[bp+96]=offset msword up 1
 ;47.[bp+98]=offset msword up 2
-;48.[bp+100]=offset move amount
+;48.[bp+100]=offset attack flag
 proc main_link_movement
 push bp
 mov bp,sp
@@ -1084,7 +1079,7 @@ push di
 push bx
 push cx
 
-    push [bp+100]   ;bp+84
+    push [bp+32]   ;bp+84
 
     push [bp+98]    ;bp+82
     push [bp+96]    ;bp+80
@@ -1194,7 +1189,7 @@ push cx
     jz yes_moving_down
     s_no_move:
     mov di,0                ;now link will move zero spaces
-    mov bx,2560
+    mov bx,5120
     mov [move_amount],moving_down
     yes_moving_down:
    
@@ -1225,7 +1220,7 @@ push cx
     jz yes_moving_up
     w_no_move:
     mov di,0                ;now link will move zero spaces
-    mov bx,-2560
+    mov bx,-5120
     mov [move_amount],moving_up
     yes_moving_up:
 
@@ -1256,7 +1251,7 @@ push cx
     jz yes_moving_right
     d_no_move:
     mov di,0                ;now link will move zero spaces
-    mov bx,8
+    mov bx,16
     mov [move_amount], moving_right
     yes_moving_right:
 
@@ -1287,7 +1282,7 @@ push cx
     jz yes_moving_left
     a_no_move:
     mov di,0                ;now link will move zero spaces
-    mov bx,-8
+    mov bx,-16
     mov [move_amount], moving_left
     yes_moving_left:
 
@@ -1302,21 +1297,21 @@ push cx
     cmp [byte ptr di],32    ;32 is space, space is for attacking
     jnz no_attack_now
 
-    mov di,[bp+30]
-    add [word ptr di],bx
-    mov di,0
-    push [bp+82]
-    push [bp+80]
-    push 40
-    push [bp+28]
-    push [bp+26]
-    push [bp+30]
-    call check_hitbox_link  ;procedure that checks if link should move or not
-    sub [word ptr di],bx
-
-    mov bx,[bp+28]
-    cmp [byte ptr bx],1
-    jz no_attack_now
+    ;mov di,[bp+30]
+    ;add [word ptr di],bx
+    ;mov di,0
+    ;push [bp+82]
+    ;push [bp+80]
+    ;push 40
+    ;push [bp+28]
+    ;push [bp+26]
+    ;push [bp+30]
+    ;call check_hitbox_link  ;procedure that checks if link should move or not
+    ;sub [word ptr di],bx
+;
+    ;mov bx,[bp+28]
+    ;cmp [byte ptr bx],1
+    ;jz no_attack_now
     mov [attack_flag],1
     no_attack_now:
 
@@ -1336,7 +1331,7 @@ endp main_link_movement
 
 ;--------------------------------------------Link Attack--------------------------------------------;
 ;bp+4=offset link location
-;bp+6=offset move amount
+;bp+6=offset last press
 ;bp+8=offset current msword down 
 ;bp+10=offset current msword left 
 ;bp+12=offset current msword right 
@@ -1345,30 +1340,30 @@ proc link_attack
 push bp
 mov bp,sp
 push si
+push di
 
-    mov si,[bp+6]
-    cmp [word ptr si],moving_down
-    jz cont_down
+    mov di,[bp+6]
+    cmp [byte ptr di],'w'
+    jnz cont_down
     mov si,[bp+4]
     mov si,[word ptr si]
-    add si,5160
+    sub si,5120
     push si
     push [bp+8]
     call put_sprite_32
     cont_down:
 
-    cmp [word ptr si],moving_up
-    jz cont_down
+    cmp [byte ptr di],'s'
+    jnz cont_up
     mov si,[bp+4]
     mov si,[word ptr si]
-    sub si,5120
     push si
     push [bp+14]
     call put_sprite_32
     cont_up:
 
-    cmp [word ptr si],moving_right
-    jz cont_down
+    cmp [byte ptr di],'a'
+    jnz cont_right
     mov si,[bp+4]
     mov si,[word ptr si]
     sub si,16
@@ -1377,21 +1372,99 @@ push si
     call put_sprite_32
     cont_right:
 
-    cmp [word ptr si],moving_left
-    jz cont_down
+    cmp [byte ptr di],'d'
+    jnz cont_left
     mov si,[bp+4]
     mov si,[word ptr si]
-    ;add si,-16
     push si
     push [bp+10]
     call put_sprite_32
     cont_left:
 
+pop di
 pop si
 pop bp
 ret 12
 endp link_attack
 ;------------------------------------------END--> Link Attack <--END------------------------------------------;
+
+;--------------------------------------------Link Attack Delete--------------------------------------------;
+;bp+4=offset link location
+;bp+6=offset last press
+;bp+8=offset screen part buffer
+proc link_attack_delete
+push bp
+mov bp,sp
+push si
+push di
+
+    mov di,[bp+6]
+    cmp [byte ptr di],'w'
+    jnz dcont_down
+
+    mov si,[bp+4]
+    mov si,[word ptr si]
+    push si
+    push [bp+8]
+    call put_sprite
+
+    sub si,5120
+    push si
+    push [bp+8]
+    call put_sprite
+    dcont_down:
+
+    cmp [byte ptr di],'s'
+    jnz dcont_up
+
+    mov si,[bp+4]
+    mov si,[word ptr si]
+    push si
+    push [bp+8]
+    call put_sprite
+
+    add si,5120
+    push si
+    push [bp+8]
+    call put_sprite
+    dcont_up:
+
+    cmp [byte ptr di],'a'
+    jnz dcont_right
+
+    mov si,[bp+4]
+    mov si,[word ptr si]
+    push si
+    push [bp+8]
+    call put_sprite
+
+    sub si,16
+    push si
+    push [bp+8]
+    call put_sprite
+    dcont_right:
+
+    cmp [byte ptr di],'d'
+    jnz dcont_left
+
+    mov si,[bp+4]
+    mov si,[word ptr si]
+    push si
+    push [bp+8]
+    call put_sprite
+
+    add si,16
+    push si
+    push [bp+8]
+    call put_sprite
+    dcont_left:
+
+pop di
+pop si
+pop bp
+ret 6
+endp link_attack_delete
+;------------------------------------------END--> Link Attack Delete <--END------------------------------------------;
 
 ;(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-LESSER CHANGES BETWEEN PROCEDURE AREAS-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--)-(--);
 
@@ -1476,6 +1549,7 @@ ret 12
 endp enemy_movement_random
 ;------------------------------------------END--> Enemy Movement Random <--END------------------------------------------;
 
+
 ;--------------------------------------------Enemy Movement Seek--------------------------------------------;
 ;bp+4=wanted enemy location offset
 ;bp+6=link location offset
@@ -1555,7 +1629,7 @@ endp enemy_movement_seek
 ;bp+78=offset msword right 2
 ;bp+80=offset msword up 1
 ;bp+82=offset msword up 2
-;bp+84=offset move amount
+;bp+84=offset last press
 proc all_actions
 push bp
 mov bp,sp
@@ -1572,24 +1646,28 @@ push bx
     push [bp+8]          ;screen part buffer
     call put_sprite
    
-    ;cmp [attack_flag],1
-    ;jz attack_phase_1
+    cmp [attack_flag],1
+    jz attack_phase_1
 
     push [si]            ;[si]= the actual location of link ;first part of link animation (before movement) ---->1 link
     push [bp+10]         ;the normal sprite for link
-    call put_sprite
-    ;jmp no_attack_phase_1
+    call put_sprite 
+    jmp no_attack_phase_1
 
-    ;attack_phase_1:
-    ;push [bp+68]
-    ;push [bp+72]
-    ;push [bp+76]
-    ;push [bp+80] 
-    ;push [bp+84]
-    ;push [bp+4]
-;
-    ;call link_attack
-    ;no_attack_phase_1:
+    attack_phase_1:
+    push [bp+8] 
+    push [bp+84]
+    push [bp+4]
+    call link_attack_delete
+
+    push [bp+68]
+    push [bp+72]
+    push [bp+76]
+    push [bp+80] 
+    push [bp+84]
+    push [bp+4]
+    call link_attack
+    no_attack_phase_1:
 
 ;-link END
 
@@ -1651,26 +1729,30 @@ push bx
     push [bp+8]          ;screen part buffer
     call put_sprite
   
-    ;cmp [attack_flag],1
-    ;jz attack_phase_2
+    cmp [attack_flag],1
+    jz attack_phase_2
 
     mov di,[bp+6]
     add [si],di          ;moving link with the desired amount
     push [si]            ;[si]= the actual location of link ;second part of link animation (after movement) ---->2 link
     push [bp+12]         ;the animated sprite for link
     call put_sprite
-    ;jmp no_attack_phase_2
+    jmp no_attack_phase_2
 
-    ;attack_phase_2:
-    ;push [bp+68]
-    ;push [bp+72]
-    ;push [bp+76]
-    ;push [bp+80] 
-    ;push [bp+84]
-    ;push [bp+4]
-;
-    ;call link_attack
-    ;no_attack_phase_2:
+    attack_phase_2:
+    push [bp+8] 
+    push [bp+84]
+    push [bp+4]
+    call link_attack_delete
+
+    push [bp+70]
+    push [bp+74]
+    push [bp+78]
+    push [bp+82]
+    push [bp+84]
+    push [bp+4]
+    call link_attack
+    no_attack_phase_2:
 
 ;-link END
 
@@ -1767,28 +1849,32 @@ push bx
 ;-------------------------;
 ;-link
 
-    ;cmp [attack_flag],1
-    ;jz attack_phase_3
-
     push [si]            ;[si]= the actual location of link ;putting the screen part buffer on the screen in links location     
     push [bp+8]          ;screen part buffer
     call put_sprite
 
+    cmp [attack_flag],1
+    jz attack_phase_3
+
     push [si]            ;[si]= the actual location of link ;third part of link animation (before movement) ---->3 link
     push [bp+10]         ;the normal sprite for link
     call put_sprite
-    ;jmp no_attack_phase_3
+    jmp no_attack_phase_3
 
-    ;attack_phase_3:
-    ;push [bp+68]
-    ;push [bp+72]
-    ;push [bp+76]
-    ;push [bp+80] 
-    ;push [bp+84]
-    ;push [bp+4]
-;
-    ;call link_attack
-    ;no_attack_phase_3:
+    attack_phase_3:
+    push [bp+8] 
+    push [bp+84]
+    push [bp+4]
+    call link_attack_delete
+
+    push [bp+72]
+    push [bp+76]
+    push [bp+80] 
+    push [bp+84]
+    push [bp+68]
+    push [bp+4]
+    call link_attack
+    no_attack_phase_3:
 
 ;-link END
 
@@ -1869,8 +1955,8 @@ ret 82
 endp all_actions
 ;-----------------------------------------END--> Frecuency Splitter <--END-----------------------------------------;
 start:
-	mov ax, @data
-	mov ds, ax
+    mov ax, @data
+    mov ds, ax
 ; --------------------------
 ; Your code here
     mov ax, 0A000h
@@ -1985,12 +2071,12 @@ start:
     mov ax,0
 
     mov ah,1
-	int 16h
+    int 16h
 jz keepGoing
     mov ax,0
 
-	mov ah,0
-	int 16h
+    mov ah,0
+    int 16h
 keepGoing:
 
     call clearkeyboardbuffer
@@ -2016,7 +2102,7 @@ keepGoing:
     call display_health_to_screen
 
     ;CALLING -> main link movement
-    push offset move_amount                     ;bp+100
+    push offset attack_flag                     ;bp+100
 
     push offset msword_up_2                     ;bp+98
     push offset msword_up_1                     ;bp+96
@@ -2096,8 +2182,8 @@ keepGoing:
     jz exit
     jmp bad
 ; --------------------------
-	
+    
 exit:
-	mov ax, 4c00h
-	int 21h
+    mov ax, 4c00h
+    int 21h
 END start
