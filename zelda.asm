@@ -1,5 +1,5 @@
 IDEAL
-MODEL small
+MODEL  small
 STACK 200h
 DATASEG
 ;                   Me when assembly
@@ -458,7 +458,7 @@ push di
     jnz  place_empty_hearts
 
     mov bx,[bp+4]
-    mov bl,[link_hp]
+    mov bl,[byte ptr bx]
     mov cx,248
     place_hearts:
 
@@ -729,20 +729,15 @@ push bx
     ;cmp [byte ptr si+1],2        ;the one right
     ;jz end_hitbox_flag_enemy
     ;
-    mov al,4            ;the value the hitbox flag will recieve
-    cmp [byte ptr si],4          ;the same one
-    jz end_hitbox_flag
-    cmp [byte ptr si-40],4       ;the one under
-    jz end_hitbox_flag_enemy
-    cmp [byte ptr si+1],4        ;the one right
-    jz end_hitbox_flag_enemy
     
     mov al,3            ;the value the hitbox flag will recieve
     cmp [byte ptr si],3          ;the same one
     jz end_hitbox_flag_enemy
-    cmp [byte ptr si-40],3       ;the one under
+    cmp [byte ptr si+40],3       ;the one under
     jz end_hitbox_flag_enemy
     cmp [byte ptr si+1],3        ;the one right
+    jz end_hitbox_flag_enemy
+    cmp [byte ptr si+41],3        ;the one down right
     jz end_hitbox_flag_enemy
 
 
@@ -768,7 +763,6 @@ push bx
     mov si,[bp+12]
     dec [byte ptr si]
     nohit_tolink:
-
 
 
 pop bx    
@@ -1087,7 +1081,8 @@ push di
 push bx
 push cx
 
-    push [bp+100]   ;bp+92
+    push [bp+30]    ;bp+96
+    push [bp+100]   ;bp+94
     push [bp+108]   ;bp+92
     push [bp+106]   ;bp+90
     push [bp+104]   ;bp+88
@@ -1203,7 +1198,6 @@ push cx
     s_no_move:
     mov di,0                ;now link will move zero spaces
     mov bx,80
-    mov [move_amount],moving_down
     yes_moving_down:
    
     push cx
@@ -1234,7 +1228,6 @@ push cx
     w_no_move:
     mov di,0                ;now link will move zero spaces
     mov bx,-80
-    mov [move_amount],moving_up
     yes_moving_up:
 
     push cx
@@ -1265,7 +1258,6 @@ push cx
     d_no_move:
     mov di,0                ;now link will move zero spaces
     mov bx,2
-    mov [move_amount], moving_right
     yes_moving_right:
 
     push cx
@@ -1296,7 +1288,6 @@ push cx
     a_no_move:
     mov di,0                ;now link will move zero spaces
     mov bx,-2
-    mov [move_amount], moving_left
     yes_moving_left:
 
     push cx
@@ -1368,12 +1359,12 @@ push bx
     push [bp+8]
     call put_sprite_32
 
-    ;mov bx,[link_location_in_hitbox]
-    ;add bx,offset hitbox_grid
-    ;mov [byte ptr bx-40],4
-    ;mov [byte ptr bx-41],4
-    ;mov [byte ptr bx-80],4
-    ;mov [byte ptr bx-81],4
+    mov bx,[link_location_in_hitbox]
+    add bx,offset hitbox_grid
+    mov [byte ptr bx-40],4
+    mov [byte ptr bx-41],4
+    mov [byte ptr bx-80],4
+    mov [byte ptr bx-81],4
     cont_down:
 
     cmp [byte ptr di],'s'
@@ -1383,6 +1374,13 @@ push bx
     push si
     push [bp+14]
     call put_sprite_32
+
+    mov bx,[link_location_in_hitbox]
+    add bx,offset hitbox_grid
+    mov [byte ptr bx+80],4
+    mov [byte ptr bx+81],4
+    mov [byte ptr bx+120],4
+    mov [byte ptr bx+121],4
     cont_up:
 
     cmp [byte ptr di],'a'
@@ -1393,6 +1391,13 @@ push bx
     push si
     push [bp+12]
     call put_sprite_32
+
+    mov bx,[link_location_in_hitbox]
+    add bx,offset hitbox_grid
+    mov [byte ptr bx-1],4
+    mov [byte ptr bx-41],4
+    mov [byte ptr bx-2],4
+    mov [byte ptr bx-42],4
     cont_right:
 
     cmp [byte ptr di],'d'
@@ -1402,6 +1407,13 @@ push bx
     push si
     push [bp+10]
     call put_sprite_32
+    
+    mov bx,[link_location_in_hitbox]
+    add bx,offset hitbox_grid
+    mov [byte ptr bx+2],4
+    mov [byte ptr bx+42],4
+    mov [byte ptr bx+3],4
+    mov [byte ptr bx+43],4
     cont_left:
 
 pop bx
@@ -1413,9 +1425,11 @@ endp link_attack
 ;------------------------------------------END--> Link Attack <--END------------------------------------------;
 
 ;--------------------------------------------Link Attack Delete--------------------------------------------;
-;bp+4=offset link location
+;bp+4=offset link location in hitbox
 ;bp+6=offset last press
 ;bp+8=offset screen part buffer
+;bp+10=offset hitbox grid
+;bp+12=offset location of link in hitbox 
 proc link_attack_delete
 push bp
 mov bp,sp
@@ -1436,6 +1450,14 @@ push di
     push si
     push [bp+8]
     call put_sprite
+
+    mov bx,[bp+12]
+    mov bx,[word ptr bx]
+    add bx,[bp+10]
+    mov [byte ptr bx-40],0
+    mov [byte ptr bx-41],0
+    mov [byte ptr bx-80],0
+    mov [byte ptr bx-81],0
     dcont_down:
 
     cmp [byte ptr di],'s'
@@ -1451,6 +1473,14 @@ push di
     push si
     push [bp+8]
     call put_sprite
+
+    mov bx,[bp+12]
+    mov bx,[word ptr bx]
+    add bx,[bp+10]
+    mov [byte ptr bx+80],0
+    mov [byte ptr bx+81],0
+    mov [byte ptr bx+120],0
+    mov [byte ptr bx+121],0
     dcont_up:
 
     cmp [byte ptr di],'a'
@@ -1466,6 +1496,15 @@ push di
     push si
     push [bp+8]
     call put_sprite
+
+    mov bx,[bp+12]
+    mov bx,[word ptr bx]
+    add bx,[bp+10]
+    add bx,offset hitbox_grid
+    mov [byte ptr bx-1],0
+    mov [byte ptr bx-41],0
+    mov [byte ptr bx-2],0
+    mov [byte ptr bx-42],0
     dcont_right:
 
     cmp [byte ptr di],'d'
@@ -1481,12 +1520,21 @@ push di
     push si
     push [bp+8]
     call put_sprite
+
+    mov bx,[bp+12]
+    mov bx,[word ptr bx]
+    add bx,[bp+10]
+    add bx,offset hitbox_grid
+    mov [byte ptr bx+2],0
+    mov [byte ptr bx+42],0
+    mov [byte ptr bx+3],0
+    mov [byte ptr bx+43],0
     dcont_left:
 
 pop di
 pop si
 pop bp
-ret 6
+ret 10
 endp link_attack_delete
 ;------------------------------------------END--> Link Attack Delete <--END------------------------------------------;
 
@@ -1502,6 +1550,7 @@ endp link_attack_delete
 ;bp+10=enemy_move_amount
 ;bp+12=enemy movement by turns (for the wanted enemy) 
 ;bp+14=enemy move amount in hitbox
+;bp+16= current enemy hp for now not
 proc enemy_movement_random
 push bp
 mov bp,sp
@@ -1509,6 +1558,7 @@ push di
 push si
 push dx
 push cx
+
 
     mov di,[bp+12]
     cmp [byte ptr di],0
@@ -1602,6 +1652,149 @@ ret 8
 endp enemy_movement_seek
 ;------------------------------------------END--> Enemy Movement Seek<--END------------------------------------------;
 
+;--------------------------------------------> Attack Check <--------------------------------------------;
+;bp+4=current enemy location in hitbox map
+;bp+6=offset link location in hitbox
+;bp+8=offset last press
+;bp+10=offset current enemy hp
+proc attack_check
+push bp
+mov bp,sp
+push si
+push ax
+push di
+
+    mov si,[bp+4]
+    mov ax,[word ptr si]        ;ax has enemy location
+    mov si,offset link_location_in_hitbox              ;si has offset link location
+    mov si,[word ptr si]
+    sub ax,si                   ;ax now holds the difference between enemy and link locations
+
+
+    mov di,[bp+8]
+    cmp [byte ptr di],'w'
+    jnz no_attack_up
+    cmp ax,0
+    jnz enemy_death1w
+    jmp enemy_death
+    enemy_death1w:
+    cmp ax,-80
+    jnz enemy_death2w
+    jmp enemy_death
+    enemy_death2w:
+    cmp ax,-120
+    jnz enemy_death3w
+    jmp enemy_death
+    enemy_death3w:
+    cmp ax,-81
+    jnz enemy_death4w
+    jmp enemy_death
+    enemy_death4w:
+    cmp ax,-121
+    jnz enemy_death5w
+    jmp enemy_death
+    enemy_death5w:
+    no_attack_up:
+
+
+    cmp [byte ptr di],'a'
+    jnz no_attack_left
+    cmp ax,0
+    jnz enemy_death1a
+    jmp enemy_death
+    enemy_death1a:
+    cmp ax,-1
+    jnz enemy_death2a
+    jmp enemy_death
+    enemy_death2a:
+    cmp ax,-2
+    jnz enemy_death3a
+    jmp enemy_death
+    enemy_death3a:
+    cmp ax,-41
+    jnz enemy_death4a
+    jmp enemy_death
+    enemy_death4a:
+    cmp ax,-42
+    jnz enemy_death5a
+    jmp enemy_death
+    enemy_death5a:
+    no_attack_left:
+
+
+    cmp [byte ptr di],'s'
+    jnz no_attack_down
+    cmp ax,0
+    jnz enemy_death1s
+    jmp enemy_death
+    enemy_death1s:
+    cmp ax,80
+    jnz enemy_death2s
+    jmp enemy_death
+    enemy_death2s:
+    cmp ax,120
+    jnz enemy_death3s
+    jmp enemy_death
+    enemy_death3s:
+    cmp ax,81
+    jnz enemy_death4s
+    jmp enemy_death
+    enemy_death4s:
+    cmp ax,121
+    jnz enemy_death5s
+    jmp enemy_death
+    enemy_death5s:
+    no_attack_down:
+
+    cmp [byte ptr di],'d'
+    jnz no_attack_right
+    cmp ax,0
+    jnz enemy_death1d
+    jmp enemy_death
+    enemy_death1d:
+    cmp ax,1
+    jnz enemy_death2d
+    jmp enemy_death
+    enemy_death2d:
+    cmp ax,2
+    jnz enemy_death3d
+    jmp enemy_death
+    enemy_death3d:
+    cmp ax,41
+    jnz enemy_death4d
+    jmp enemy_death
+    enemy_death4d:
+    cmp ax,42
+    jnz enemy_death5d
+    jmp enemy_death
+    enemy_death5d:
+    no_attack_right:
+
+    jmp enemy_saved
+    enemy_death:
+    mov si,[bp+10]
+    mov [byte ptr si],0
+
+    mov si,[bp+4]                   ;enemy is at zero space.
+    ;mov [byte ptr si],0
+    ;mov [byte ptr si+1],0
+    ;mov [byte ptr si+40],0
+    ;mov [byte ptr si+41],0
+    enemy_saved:
+
+    
+
+
+
+pop di
+pop ax
+pop si
+pop bp
+ret 8
+endp attack_check
+;------------------------------------------END--> Attack Check <--END------------------------------------------;
+
+
 
 ;------------------------------------------END--> Enemy Procedures <--END------------------------------------------;
 
@@ -1659,6 +1852,7 @@ endp enemy_movement_seek
 ;bp+90=offset enemy3 hp
 ;bp+92=offset enemy4 hp
 ;bp+94=offset attack flag
+;bp+96=offset link location in hitbox
 proc all_actions
 push bp
 mov bp,sp
@@ -1675,7 +1869,8 @@ push bx
     push [bp+8]          ;screen part buffer
     call put_sprite
    
-    cmp [attack_flag],1
+    mov di,[bp+94]
+    cmp [byte ptr di],1
     jz attack_phase_1
 
     push [si]            ;[si]= the actual location of link ;first part of link animation (before movement) ---->1 link
@@ -1684,6 +1879,8 @@ push bx
     jmp no_attack_phase_1
 
     attack_phase_1:
+    push [bp+24]
+    push [bp+26]
     push [bp+8] 
     push [bp+84]
     push [bp+4]
@@ -1702,6 +1899,10 @@ push bx
 
 ;-enemy 1
 
+    mov di,[bp+86]
+    cmp [byte ptr di],0
+    jz e1_p1_no
+
     push [bp+22]        ;bp+14 enemy1 move amount in hitbox
     push [bp+18]        ;bp+12 enemy1 movement by turns
     push [bp+16]        ;bp+10 enemy1 move amount
@@ -1719,9 +1920,15 @@ push bx
     push [bp+60]        ;second wanted sprite for enemy1
     call put_sprite
 
+    e1_p1_no:
+
 ;-enemy 1 END
 
 ;-enemy 2
+
+    mov di,[bp+88]
+    cmp [byte ptr di],0
+    jz e2_p1_no
 
     mov di,[bp+30]      ;enemy2 location is updated
     push [di]
@@ -1733,9 +1940,15 @@ push bx
     push [bp+60]        ;second wanted sprite for enemy2
     call put_sprite
 
+    e2_p1_no:
+
 ;-enemy2 END
 
 ;-enemy3
+
+    mov di,[bp+90]
+    cmp [byte ptr di],0
+    jz e3_p1_no
 
     mov di,[bp+40]      ;enemy3 location is updated
     push [di]
@@ -1746,6 +1959,8 @@ push bx
     push [di]
     push [bp+60]        ;second wanted sprite for enemy3
     call put_sprite
+
+    e3_p1_no:
 
 ;-enemy3 END
 ;-------------------------;
@@ -1758,7 +1973,8 @@ push bx
     push [bp+8]          ;screen part buffer
     call put_sprite
   
-    cmp [attack_flag],1
+    mov di,[bp+94]
+    cmp [byte ptr di],1
     jz attack_phase_2
 
     mov di,[bp+6]
@@ -1769,6 +1985,8 @@ push bx
     jmp no_attack_phase_2
 
     attack_phase_2:
+    push [bp+24]
+    push [bp+26]
     push [bp+8] 
     push [bp+84]
     push [bp+4]
@@ -1787,13 +2005,9 @@ push bx
 
 ;-enemy1
 
-    push [bp+36]        ;bp+14 enemy2 move amount in hitbox
-    push [bp+34]        ;bp+12 enemy2 movement by turns
-    push [bp+32]        ;bp+10 enemy2 move amount
-    push [bp+20]        ;bp+8 random_number
-    push [bp+4]         ;bp+6 link location offset
-    push [bp+30]        ;bp+4 enemy1 location offset
-    call enemy_movement_random
+    mov di,[bp+86]
+    cmp [byte ptr di],0
+    jz e1_p2_no
 
     mov di,[bp+14]      ;enemy1 location is updated
     push [di]
@@ -1804,11 +2018,23 @@ push bx
     push [bp+66]
     push [bp+64]
     mov bx,[bp+22]
-    push [word ptr bx]      ;bp+10 enemy1  true move amount in hitbox
+    push [word ptr bx]      ;bp+10 enemy2 true move amount in hitbox
     push [bp+28]            ;bp+8 hitbox flag
     push [bp+26]            ;bp+6 hitbox grid
     push [bp+24]            ;bp+4 enemy1 location in hitbox
     call check_hitbox_enemy
+
+    mov di,[bp+94]
+    cmp [byte ptr di],1
+    jnz no_attack_e_1
+
+    push [bp+86]
+    push [bp+84]
+    push [bp+96]
+    push [bp+24]
+    call attack_check
+    no_attack_e_1:
+    mov di,[bp+14]
 
     mov bx,[bp+28]  ;hitbox flag
     mov bl,[byte ptr bx]
@@ -1825,9 +2051,23 @@ push bx
     push [bp+62]        ;second wanted sprite for enemy1
     call put_sprite
 
+    e1_p2_no:
+
 ;-enemy1 END
 
 ;-enemy2
+
+    mov di,[bp+88]
+    cmp [byte ptr di],0
+    jz e2_p2_no
+
+    push [bp+36]        ;bp+14 enemy2 move amount in hitbox
+    push [bp+34]        ;bp+12 enemy2 movement by turns
+    push [bp+32]        ;bp+10 enemy2 move amount
+    push [bp+20]        ;bp+8 random_number
+    push [bp+4]         ;bp+6 link location offset
+    push [bp+30]        ;bp+4 enemy1 location offset
+    call enemy_movement_random
 
     mov di,[bp+30]      ;enemy2 location is updated
     push [di]
@@ -1844,6 +2084,18 @@ push bx
     push [bp+38]            ;bp+4 enemy2 location in hitbox
     call check_hitbox_enemy
 
+    mov di,[bp+94]
+    cmp [byte ptr di],1
+    jnz no_attack_e_2
+
+    push [bp+88]
+    push [bp+84]
+    push [bp+96]
+    push [bp+38]
+    call attack_check
+    no_attack_e_2:
+    mov di,[bp+30]
+
     mov bx,[bp+28]  ;hitbox flag
     mov bl,[byte ptr bx]
     cmp bl,0
@@ -1858,10 +2110,15 @@ push bx
     push [di]
     push [bp+62]        ;second wanted sprite for enemy1
     call put_sprite
+    e2_p2_no:
 
 ;-enemy2 END
 
 ;-enemy3
+
+    mov di,[bp+90]
+    cmp [byte ptr di],0
+    jz e3_p2_no
 
     mov di,[bp+40]      ;enemy3 location is updated
     push [di]
@@ -1872,6 +2129,8 @@ push bx
     push [di]
     push [bp+62]        ;second wanted sprite for enemy3
     call put_sprite
+
+    e3_p2_no:
 
 ;enemy3 END
 ;-------------------------;
@@ -1884,7 +2143,8 @@ push bx
     push [bp+8]          ;screen part buffer
     call put_sprite
 
-    cmp [attack_flag],1
+    mov di,[bp+94]
+    cmp [byte ptr di],1
     jz attack_phase_3
 
     push [si]            ;[si]= the actual location of link ;third part of link animation (before movement) ---->3 link
@@ -1893,6 +2153,8 @@ push bx
     jmp no_attack_phase_3
 
     attack_phase_3:
+    push [bp+24]
+    push [bp+26]
     push [bp+8] 
     push [bp+84]
     push [bp+4]
@@ -1907,9 +2169,13 @@ push bx
     call link_attack
     no_attack_phase_3:
 
-;-link END
+;-link END 
 
 ;-enemy1
+
+    mov di,[bp+86]
+    cmp [byte ptr di],0
+    jz e1_p3_no
 
     mov di,[bp+14]      ;enemy1 location is updated
     push [di]
@@ -1920,9 +2186,15 @@ push bx
     push [bp+60]        ;second wanted sprite for enemy1
     call put_sprite
 
+    e1_p3_no:
+
 ;-enemy1 END
 
 ;-enemy2
+
+    mov di,[bp+88]
+    cmp [byte ptr di],0
+    jz e2_p3_no
 
     mov di,[bp+30]      ;enemy2 location is updated
     push [di]
@@ -1934,9 +2206,15 @@ push bx
     push [bp+60]        ;second wanted sprite for enemy2
     call put_sprite
 
+    e2_p3_no:
+
 ;enemy2 END
 
 ;-enemy3
+
+    mov di,[bp+90]
+    cmp [byte ptr di],0
+    jz e3_p3_no
 
     push [bp+46]        ;bp+14 enemy3 move amount in hitbox
     push [bp+44]        ;bp+12 enemy3 movement by turns
@@ -1961,6 +2239,18 @@ push bx
     push [bp+48]            ;bp+4 enemy3 location in hitbox
     call check_hitbox_enemy
 
+    mov di,[bp+94]
+    cmp [byte ptr di],1
+    jnz no_attack_e_3
+
+    push [bp+90]
+    push [bp+84]
+    push [bp+96]
+    push [bp+48]
+    call attack_check
+    no_attack_e_3:
+    mov di,[bp+40]
+
     mov bx,[bp+28]  ;hitbox flag
     mov bl,[byte ptr bx]
     cmp bl,0
@@ -1975,6 +2265,7 @@ push bx
     push [di]
     push [bp+60]        ;second wanted sprite for enemy3
     call put_sprite
+    e3_p3_no:
 
 ;-enemy3 END
 
@@ -1983,7 +2274,7 @@ pop ax
 pop di
 pop si
 pop bp
-ret 92
+ret 94
 endp all_actions
 ;-----------------------------------------END--> Frecuency Splitter <--END-----------------------------------------;
 start:
@@ -2020,10 +2311,10 @@ start:
     mov [enemy1_move_amount_in_hitbox] , 0
     mov [enemy1_hp] , 1
 
-    mov [enemy2_location] , 30896
+    mov [enemy2_location] , 30880
     mov [enemy2_movement_by_turns] , 0
     mov [enemy2_move_amount] , 0
-    mov [enemy2_location_in_hitbox] , 502
+    mov [enemy2_location_in_hitbox] , 500
     mov [enemy2_move_amount_in_hitbox] , 0
     mov [enemy2_hp] , 1
 
@@ -2039,7 +2330,7 @@ start:
     mov [enemy4_move_amount] , 0
     mov [enemy4_location_in_hitbox] , 460
     mov [enemy4_move_amount_in_hitbox] , 0
-    mov [enemy4_hp] , 1
+    mov [enemy4_hp] , 0
 
     mov [random_number] , 0
 
@@ -2093,12 +2384,6 @@ start:
     mov [new_room_flag],0
     no_new_room:
 
-    ;mov si,offset hitbox_grid   ;si points to the hitbox grid
-    ;add si,[enemy1_location_in_hitbox]   ;si has the current location of the enemy inside of the hitbox grid
-    ;mov [byte ptr si], 2
-    ;mov [byte ptr si+1], 2
-    ;mov [byte ptr si+40], 2
-    ;mov [byte ptr si+41], 2
 
     mov ax,0
 
@@ -2134,10 +2419,10 @@ keepGoing:
     call display_health_to_screen
 
     ;CALLING -> main link movement
-    push offset enemy1_hp                       ;bp+108
-    push offset enemy2_hp                       ;bp+106
-    push offset enemy3_hp                       ;bp+104
-    push offset enemy4_hp                       ;bp+102
+    push offset enemy4_hp                       ;bp+108
+    push offset enemy3_hp                       ;bp+106
+    push offset enemy2_hp                       ;bp+104
+    push offset enemy1_hp                       ;bp+102
 
     push offset attack_flag                     ;bp+100
 
@@ -2206,7 +2491,7 @@ keepGoing:
     push offset button_pressed                  ;bp+6
     push offset link_location                   ;bp+4
     call main_link_movement
-
+    
 
     cmp [link_hp],0
     jnz nodie
