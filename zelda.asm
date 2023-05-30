@@ -410,6 +410,7 @@ pop bp
 ret 20
 endp implement_enemy_to_room
 ;----------------------------------------------END--> Enemy Implimating Procedure <--END----------------------------------------------;
+
 ;------------------magic------------------;
 
 proc clearkeyboardbuffer
@@ -692,6 +693,7 @@ endp check_hitbox_link
 ;bp+10=enemy movement in hitbox
 ;bp+12=link hp
 ;bp+14=link hp grace
+;bp+16=enemy hp
 proc check_hitbox_enemy
 push bp
 mov bp,sp
@@ -727,13 +729,13 @@ push bx
     ;cmp [byte ptr si+1],2        ;the one right
     ;jz end_hitbox_flag_enemy
     ;
-    ;mov al,2            ;the value the hitbox flag will recieve
-    ;cmp [byte ptr si],4          ;the same one
-    ;jz end_hitbox_flag
-    ;cmp [byte ptr si-40],4       ;the one under
-    ;jz end_hitbox_flag_enemy
-    ;cmp [byte ptr si+1],4        ;the one right
-    ;jz end_hitbox_flag_enemy
+    mov al,4            ;the value the hitbox flag will recieve
+    cmp [byte ptr si],4          ;the same one
+    jz end_hitbox_flag
+    cmp [byte ptr si-40],4       ;the one under
+    jz end_hitbox_flag_enemy
+    cmp [byte ptr si+1],4        ;the one right
+    jz end_hitbox_flag_enemy
     
     mov al,3            ;the value the hitbox flag will recieve
     cmp [byte ptr si],3          ;the same one
@@ -767,13 +769,15 @@ push bx
     dec [byte ptr si]
     nohit_tolink:
 
+
+
 pop bx    
 pop ax
 pop dx
 pop di
 pop si
 pop bp
-ret 12
+ret 14
 endp check_hitbox_enemy
 ;----------------------------------------------END--> Check Hitbox Enemy <--END----------------------------------------------;
 
@@ -1071,6 +1075,10 @@ endp generate_random_number
 ;46.[bp+96]=offset msword up 1
 ;47.[bp+98]=offset msword up 2
 ;48.[bp+100]=offset attack flag
+;49.[bp+102]=offset enemy1 hp
+;50.[bp+104]=offset enemy2 hp
+;51.[bp+106]=offset enemy3 hp
+;52.[bp+108]=offset enemy4 hp
 proc main_link_movement
 push bp
 mov bp,sp
@@ -1079,7 +1087,12 @@ push di
 push bx
 push cx
 
-    push [bp+32]   ;bp+84
+    push [bp+100]   ;bp+92
+    push [bp+108]   ;bp+92
+    push [bp+106]   ;bp+90
+    push [bp+104]   ;bp+88
+    push [bp+102]   ;bp+86
+    push [bp+32]    ;bp+84
 
     push [bp+98]    ;bp+82
     push [bp+96]    ;bp+80
@@ -1189,7 +1202,7 @@ push cx
     jz yes_moving_down
     s_no_move:
     mov di,0                ;now link will move zero spaces
-    mov bx,5120
+    mov bx,80
     mov [move_amount],moving_down
     yes_moving_down:
    
@@ -1220,7 +1233,7 @@ push cx
     jz yes_moving_up
     w_no_move:
     mov di,0                ;now link will move zero spaces
-    mov bx,-5120
+    mov bx,-80
     mov [move_amount],moving_up
     yes_moving_up:
 
@@ -1251,7 +1264,7 @@ push cx
     jz yes_moving_right
     d_no_move:
     mov di,0                ;now link will move zero spaces
-    mov bx,16
+    mov bx,2
     mov [move_amount], moving_right
     yes_moving_right:
 
@@ -1282,7 +1295,7 @@ push cx
     jz yes_moving_left
     a_no_move:
     mov di,0                ;now link will move zero spaces
-    mov bx,-16
+    mov bx,-2
     mov [move_amount], moving_left
     yes_moving_left:
 
@@ -1297,35 +1310,37 @@ push cx
     cmp [byte ptr di],32    ;32 is space, space is for attacking
     jnz no_attack_now
 
-    ;mov di,[bp+30]
-    ;add [word ptr di],bx
-    ;mov di,0
-    ;push [bp+82]
-    ;push [bp+80]
-    ;push 40
-    ;push [bp+28]
-    ;push [bp+26]
-    ;push [bp+30]
-    ;call check_hitbox_link  ;procedure that checks if link should move or not
-    ;sub [word ptr di],bx
-;
-    ;mov bx,[bp+28]
-    ;cmp [byte ptr bx],1
-    ;jz no_attack_now
-    mov [attack_flag],1
+    mov di,[bp+30]
+    add [word ptr di],bx
+
+    push [bp+82]
+    push [bp+80]
+    push 0
+    push [bp+28]
+    push [bp+26]
+    push [bp+30]
+    call check_hitbox_link  ;procedure that checks if link should move or not
+    sub [word ptr di],bx
+
+    mov bx,[bp+28]
+    cmp [byte ptr bx],1
+    jz no_attack_now
+    mov si,[bp+100]
+    mov [byte ptr si],1
     no_attack_now:
 
 
     call all_actions
 
-    mov [attack_flag],0
+    mov si,[bp+100]
+    mov [byte ptr si],0
 
 pop cx
 pop bx
 pop di
 pop si
 pop bp
-ret 98
+ret 106
 endp main_link_movement
 ;------------------------------------------END--> Main Link Movement <--END------------------------------------------;
 
@@ -1341,6 +1356,7 @@ push bp
 mov bp,sp
 push si
 push di
+push bx
 
     mov di,[bp+6]
     cmp [byte ptr di],'w'
@@ -1351,6 +1367,13 @@ push di
     push si
     push [bp+8]
     call put_sprite_32
+
+    ;mov bx,[link_location_in_hitbox]
+    ;add bx,offset hitbox_grid
+    ;mov [byte ptr bx-40],4
+    ;mov [byte ptr bx-41],4
+    ;mov [byte ptr bx-80],4
+    ;mov [byte ptr bx-81],4
     cont_down:
 
     cmp [byte ptr di],'s'
@@ -1381,6 +1404,7 @@ push di
     call put_sprite_32
     cont_left:
 
+pop bx
 pop di
 pop si
 pop bp
@@ -1630,6 +1654,11 @@ endp enemy_movement_seek
 ;bp+80=offset msword up 1
 ;bp+82=offset msword up 2
 ;bp+84=offset last press
+;bp+86=offset enemy1 hp
+;bp+88=offset enemy2 hp
+;bp+90=offset enemy3 hp
+;bp+92=offset enemy4 hp
+;bp+94=offset attack flag
 proc all_actions
 push bp
 mov bp,sp
@@ -1771,6 +1800,7 @@ push bx
     push [bp+8]         ;screen part buffer
     call put_sprite
 
+    push [bp+86]
     push [bp+66]
     push [bp+64]
     mov bx,[bp+22]
@@ -1804,6 +1834,7 @@ push bx
     push [bp+8]         ;screen part buffer
     call put_sprite
 
+    push [bp+88]
     push [bp+66]
     push [bp+64]
     mov bx,[bp+36]
@@ -1920,6 +1951,7 @@ push bx
     push [bp+8]         ;screen part buffer
     call put_sprite
 
+    push [bp+90]
     push [bp+66]
     push [bp+64]
     mov bx,[bp+46]
@@ -1951,7 +1983,7 @@ pop ax
 pop di
 pop si
 pop bp
-ret 82
+ret 92
 endp all_actions
 ;-----------------------------------------END--> Frecuency Splitter <--END-----------------------------------------;
 start:
@@ -2102,6 +2134,11 @@ keepGoing:
     call display_health_to_screen
 
     ;CALLING -> main link movement
+    push offset enemy1_hp                       ;bp+108
+    push offset enemy2_hp                       ;bp+106
+    push offset enemy3_hp                       ;bp+104
+    push offset enemy4_hp                       ;bp+102
+
     push offset attack_flag                     ;bp+100
 
     push offset msword_up_2                     ;bp+98
